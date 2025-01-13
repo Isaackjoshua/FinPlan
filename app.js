@@ -75,3 +75,59 @@ const displayRequests = () => {
 
 // Call the function to display requests
 displayRequests();
+// Handle "Notify Me" button click
+const notifyMeButton = document.getElementById('notify-me');
+
+notifyMeButton.addEventListener('click', () => {
+    alert('Thank you! We’ll notify you when the Micro-Investments feature is live.');
+});
+// Content for financial literacy topics
+const literacyContent = {
+    budgeting: `
+        <h3>Budgeting</h3>
+        <p>Budgeting is the foundation of financial success. Here are some tips:</p>
+        <ul>
+            <li>Track your expenses regularly.</li>
+            <li>Set realistic spending limits.</li>
+            <li>Follow the 50/30/20 rule: 50% for needs, 30% for wants, 20% for savings.</li>
+        </ul>
+    `,
+    investing: `
+        <h3>Investing Basics</h3>
+        <p>Investing helps you grow your wealth over time. Key points to remember:</p>
+        <ul>
+            <li>Understand the risks and rewards of different investments.</li>
+            <li>Diversify your portfolio to minimize risk.</li>
+            <li>Start small and increase your investments as you learn.</li>
+        </ul>
+    `,
+    saving: `
+        <h3>Saving Strategies</h3>
+        <p>Saving money is crucial for financial stability. Here's how to start:</p>
+        <ul>
+            <li>Set specific savings goals (e.g., emergency fund, travel, etc.).</li>
+            <li>Automate your savings to make it a habit.</li>
+            <li>Cut unnecessary expenses and redirect them to savings.</li>
+        </ul>
+    `,
+    debt: `
+        <h3>Managing Debt</h3>
+        <p>Debt can be overwhelming, but it can be managed effectively:</p>
+        <ul>
+            <li>Pay off high-interest debts first (debt avalanche method).</li>
+            <li>Consider the snowball method for quick wins: pay small debts first.</li>
+            <li>Avoid taking on new debt unless absolutely necessary.</li>
+        </ul>
+    `,
+};
+
+// Handle topic button clicks
+const literacyTopics = document.getElementById('literacy-topics');
+const literacyContentDiv = document.getElementById('literacy-content');
+
+literacyTopics.addEventListener('click', (event) => {
+    if (event.target.classList.contains('topic-btn')) {
+        const topic = event.target.getAttribute('data-topic');
+        literacyContentDiv.innerHTML = literacyContent[topic] || '<p>Content not available.</p>';
+    }
+});
