@@ -49,3 +49,95 @@ button {
     cursor: pointer;
     font-size: 1rem;
 }
+html{
+    scroll-behavior:smooth;
+}
+
+/*#coming-soon {
+    text-align: center;
+    background-color: #f0f0ff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}*/
+
+.coming-soon-banner {
+    margin-top: 1rem;
+    background-color: #ffcccb;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    color: #f40c0c;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.collapsible {
+    margin-bottom: 1rem;
+}
+
+.collapsible-btn {
+    background-color: #6200ea;
+    color: white;
+    border: none;
+    padding: 1rem;
+    width: 100%;
+    text-align: left;
+    font-size: 1.2rem;
+    border-radius: 5px;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.3s ease;
+}
+
+.collapsible-btn:hover {
+    background-color: #4a00b4;
+}
+
+.collapsible-content {
+    display: none;
+    padding: 1rem;
+    background-color: #f4f4f9;
+    border-left: 4px solid #6200ea;
+    border-radius: 5px;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+}
+
+#mentor-form {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#mentor-form label {
+    display: block;
+    margin: 0.5rem 0 0.2rem;
+    font-weight: bold;
+}
+
+#mentor-form input, #mentor-form select {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+#mentor-form button {
+    background-color: #6200ea;
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#mentor-form button:hover {
+    background-color: #4a00b4;
+}

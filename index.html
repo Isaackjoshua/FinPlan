@@ -20,29 +20,71 @@
         <section id="learn">
             <h2>Financial Literacy</h2>
             <p>Explore lessons, tips, and resources to improve your financial knowledge.</p>
-            <ul>
-                <li><strong>Budgeting Basics</strong> - Learn to manage finances and create a budget.</li>
-                <li><strong>Investing Basics</strong> - Get an introduction to stocks, bonds, and other investment options.</li>
-                <li><strong>Saving Tips</strong> - Learn effective strategies to save money and build your future.</li>   
-            </ul>
-            <button onclick="showComingSoon()">Explore Now</button>
+            
+            <div class="collapsible">
+                <button class="collapsible-btn">Budgeting Basics</button>
+                <div class="collapsible-content">
+                    <p>Learn how to create a budget, track your expenses, and save money effectively.</p>
+                </div>
+            </div>
+        
+            <div class="collapsible">
+                <button class="collapsible-btn">Investing Basics</button>
+                <div class="collapsible-content">
+                    <p>An introduction to stocks, bonds, mutual funds, and how to start investing safely.</p>
+                </div>
+            </div>
+        
+            <div class="collapsible">
+                <button class="collapsible-btn">Saving Tips</button>
+                <div class="collapsible-content">
+                    <p>Discover practical ways to save money and build a strong financial foundation.</p>
+                </div>
+            </div>
         </section>
+        
 
         <section id="mentorship">
             <h2>Mentorship</h2>
             <p>Connect with experts who can guide you on your financial journey.</p>
             <ul>
                 <li><strong>One-on-One Sessions</strong> - Schedule a personal session with a mentor.</li>
-                <li><strong>Group Mentoring</strong> - Join group sessions to learn from experts and peers. </li>
+                <li><strong>Group Mentoring</strong> - Join group sessions to learn from experts and peers.</li>
                 <li><strong>Online Resources</strong> - Access recorded webinars and materials for self-paced learning.</li>
             </ul>
-            <button onclick="showComingSoon()">Find a Mentor</button>
+            <form id="mentor-form">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" placeholder="Enter your name" required>
+                
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                
+                <label for="interest">Area of Interest:</label>
+                <select id="interest" name="interest" required>
+                    <option value="" disabled selected>Select an area</option>
+                    <option value="budgeting">Budgeting</option>
+                    <option value="investing">Investing</option>
+                    <option value="saving">Saving</option>
+                </select>
+            
+                
+                <button type="submit">Request Mentorship</button>
+            </form>
+        </section>        
+        <section id="requests">
+            <h2>Mentorship Requests</h2>
+            <ul id="requests-list"></ul>
         </section>
+        
 
         <section id="coming-soon">
-            <h2>Micro-Investments</h2>
-            <p>This exciting feature is under development. Stay tuned for updates!</p>
+            <h2>Micro-Investment Feature</h2>
+            <p>Exciting things are coming your way! Our micro-investment feature will allow you to start investing with as little as $1.</p>
+            <div class="coming-soon-banner">
+                Stay tuned for updates!
+            </div>
         </section>
+        
     </main>
     <script src="app.js"></script>
 </body>
