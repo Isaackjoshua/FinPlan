@@ -2,7 +2,7 @@ import { monthName } from '@/components/plan-results';
 import { Empty, PageHeader, Stat } from '@/components/ui';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
-import { formatAmount, getCurrentPlan, listCheckIns, listGoals, listItems, profileWarnings, summarise } from '@fin/core';
+import { formatAmount, getCurrentPlan, getLessonStates, listCheckIns, listGoals, listItems, listLessons, profileWarnings, recommendLessons, summarise } from '@fin/core';
 import Link from 'next/link';
 
 export const metadata = { title: 'Dashboard' };
@@ -11,17 +11,23 @@ export default async function Dashboard() {
   const { userId, name, profile } = await requireProfile();
   const ctx = getCtx();
   const cur = profile.currency;
-  const [items, goals, plan, checkIns] = await Promise.all([
+  const [items, goals, plan, checkIns, lessonStates] = await Promise.all([
     listItems(ctx, userId),
     listGoals(ctx, userId),
     getCurrentPlan(ctx, userId),
     listCheckIns(ctx, userId, 1),
+    getLessonStates(ctx, userId),
   ]);
   const s = summarise(items);
   const warnings = profileWarnings(s);
   const activeGoals = goals.filter((g) => g.status === 'active');
   const monthsCovered = s.monthlyEssentialExpenses > 0 ? (s.emergencyFund / s.monthlyEssentialExpenses).toFixed(1) : null;
   const lastCheckIn = checkIns[0];
+  const lessons = listLessons();
+  const completedLessons = new Set([...lessonStates].filter(([, st]) => st.status === 'completed').map(([slug]) => slug));
+  const assignedLessons = lessons.filter((l) => lessonStates.get(l.slug)?.assignment?.status === 'assigned');
+  // Assigned lessons come first; otherwise fall back to what the profile suggests.
+  const nextLessons = (assignedLessons.length > 0 ? assignedLessons : recommendLessons(s, warnings, completedLessons)).slice(0, 3);
   const debtPlan = plan?.results?.debt?.[plan.inputs.debtStrategy ?? 'avalanche'];
 
   return (
@@ -94,6 +100,29 @@ export default async function Dashboard() {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </section>
+
+        <section className="card lg:col-span-2">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Lessons</h2>
+            <Link href="/lessons" className="link text-sm">All lessons</Link>
+          </div>
+          <p className="text-sm text-muted">
+            {completedLessons.size} of {lessons.length} completed
+            {assignedLessons.length > 0 && <> · {assignedLessons.length} assigned to you</>}
+          </p>
+          {nextLessons.length > 0 && (
+            <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+              {nextLessons.map((lesson) => (
+                <li key={lesson.slug}>
+                  <Link href={`/lessons/${lesson.slug}`} className="block rounded-lg border border-line px-3 py-2 text-sm hover:bg-paper">
+                    <span className="font-medium">{lesson.title}</span>
+                    <span className="block text-xs text-muted">{assignedLessons.length > 0 ? 'Assigned' : 'Suggested'} · {lesson.minutes} min</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
           )}
         </section>

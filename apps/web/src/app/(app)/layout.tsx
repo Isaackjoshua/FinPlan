@@ -9,6 +9,7 @@ const NAV = [
   ['/goals', 'Goals'],
   ['/plan', 'Plan'],
   ['/check-ins', 'Check-ins'],
+  ['/lessons', 'Lessons'],
 ] as const;
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
