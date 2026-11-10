@@ -3,3 +3,22 @@ packages:
   - packages/*
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@better-auth/core@1.7.19'
+  - '@better-auth/drizzle-adapter@1.7.19'
+  - '@better-auth/kysely-adapter@1.7.19'
+  - '@better-auth/memory-adapter@1.7.19'
+  - '@better-auth/mongo-adapter@1.7.19'
+  - '@better-auth/prisma-adapter@1.7.19'
+  - '@better-auth/telemetry@1.7.19'
+  - '@next/env@16.4.6'
+  - '@next/swc-darwin-arm64@16.4.6'
+  - '@next/swc-darwin-x64@16.4.6'
+  - '@next/swc-linux-arm64-gnu@16.4.6'
+  - '@next/swc-linux-arm64-musl@16.4.6'
+  - '@next/swc-linux-x64-gnu@16.4.6'
+  - '@next/swc-linux-x64-musl@16.4.6'
+  - '@next/swc-win32-arm64-msvc@16.4.6'
+  - '@next/swc-win32-x64-msvc@16.4.6'
+  - better-auth@1.7.19
+  - next@16.4.6
