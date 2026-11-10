@@ -3,8 +3,10 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -233,4 +235,63 @@ export const checkIns = pgTable(
     createdAt,
   },
   (t) => [index('check_ins_user_idx').on(t.userId, t.periodEnd)],
+);
+
+// ---------------------------------------------------------------------------
+// Literacy. Lesson content lives in code (packages/core/src/content) and is
+// referred to by slug; these tables hold each user's assignments and progress.
+// ---------------------------------------------------------------------------
+
+export const lessonAssignments = pgTable(
+  'lesson_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    lessonSlug: text('lesson_slug').notNull(),
+    status: text('status', { enum: ['assigned', 'completed', 'dismissed'] })
+      .notNull()
+      .default('assigned'),
+    actorType: actorType('actor_type').notNull(),
+    connectionId: uuid('connection_id'),
+    /** Encrypted: the reason an agent gives may describe the user's finances. */
+    data: text('data').notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [uniqueIndex('lesson_assignments_user_lesson').on(t.userId, t.lessonSlug)],
+);
+
+export const lessonProgress = pgTable(
+  'lesson_progress',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    lessonSlug: text('lesson_slug').notNull(),
+    status: text('status', { enum: ['started', 'completed'] }).notNull(),
+    /** Best quiz result so far, as a percentage. */
+    bestScore: integer('best_score'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.lessonSlug] })],
+);
+
+export const quizAttempts = pgTable(
+  'quiz_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    lessonSlug: text('lesson_slug').notNull(),
+    correct: integer('correct').notNull(),
+    total: integer('total').notNull(),
+    /** The option index chosen for each question, in order. */
+    answers: jsonb('answers').$type<number[]>().notNull(),
+    createdAt,
+  },
+  (t) => [index('quiz_attempts_user_lesson').on(t.userId, t.lessonSlug, t.createdAt)],
 );
