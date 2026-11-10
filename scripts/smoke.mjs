@@ -90,10 +90,20 @@ check('plan v2 saved', (await plan('Second plan: <b>bold</b> savings push')).inc
 let planPage = (await get('/plan')).html;
 check('v2 is current', /Version 2 · saved/.test(txt(planPage)));
 check('agent/user text is escaped, not rendered as HTML', planPage.includes('&lt;b&gt;bold&lt;/b&gt;') && !planPage.includes('<b>bold</b>'));
+// Mobile loan: 30,000 at 36% (3% a month), paying 3,000 minimum + 5,000 extra = 8,000 a month.
+//   30,000 → 22,900 → 15,587 → 8,054.61 → 296.25 → paid in month 5 (March 2027 from November 2026).
+const planText = txt(planPage);
+const expectFreeBy = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 4, 1)));
+check('plan shows debt-free date from the engine', planText.replace(/\s/g, '').includes(`Debt-free in 5 months (${expectFreeBy})`.replace(/\s/g, '')), planText.slice(planText.indexOf('works out'), planText.indexOf('works out') + 500));
+check('plan shows total interest (2,305.14)', planText.includes('KES 2,305.14'));
+check('plan shows unallocated income (120,000 − 65,000 − 8,000)', planText.includes('KES 47,000.00'));
+check('plan shows emergency fund target (3 × 66,666.67)', planText.includes('KES 200,000.01'));
 check('revert to v1', (await submit('/plan', (f) => f.hidden.version === '1', {})).includes('Version 1 is now'));
 planPage = txt((await get('/plan')).html);
 check('v1 is current again and v2 is kept', /Version 1 · saved/.test(planPage) && planPage.includes('Second plan'));
-check('dashboard shows reverted plan', txt((await get('/dashboard')).html).includes('First plan: clear the mobile loan'));
+dash = txt((await get('/dashboard')).html);
+check('dashboard shows reverted plan', dash.includes('First plan: clear the mobile loan'));
+check('dashboard shows debt-free date', dash.includes(`Debt-free by ${expectFreeBy}`));
 
 check('check-in with reversed dates rejected', (await submit('/check-ins', has('periodStart'), { periodStart: '2026-10-31', periodEnd: '2026-10-01', income: '1', debt: '0', savings: '0' })).includes('error='));
 await submit('/check-ins', has('periodStart'), { periodStart: '2026-10-01', periodEnd: '2026-10-31', income: '120000', 'spend.housing': '45000', 'spend.food': '24000', debt: '8000', savings: '10000', note: 'Food ran over' });
