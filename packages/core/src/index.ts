@@ -6,3 +6,4 @@ export * from './profile';
 export * from './plans';
 export * from './checkins';
 export * from './summary';
+export * from './warnings';
