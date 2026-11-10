@@ -1,0 +1,22 @@
+{
+  "name": "finplan",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": { "node": ">=22.19" },
+  "scripts": {
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @fin/db generate",
+    "db:migrate": "pnpm --filter @fin/db migrate",
+    "dev": "pnpm --filter @fin/web dev",
+    "build": "pnpm --filter @fin/web build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
