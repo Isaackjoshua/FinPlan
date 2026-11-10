@@ -4,6 +4,7 @@ export * from './money';
 export * from './schemas';
 export * from './profile';
 export * from './plans';
+export * from './planResults';
 export * from './checkins';
 export * from './summary';
 export * from './warnings';

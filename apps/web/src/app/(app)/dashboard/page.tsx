@@ -1,3 +1,4 @@
+import { monthName } from '@/components/plan-results';
 import { Empty, PageHeader, Stat } from '@/components/ui';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
@@ -21,6 +22,7 @@ export default async function Dashboard() {
   const activeGoals = goals.filter((g) => g.status === 'active');
   const monthsCovered = s.monthlyEssentialExpenses > 0 ? (s.emergencyFund / s.monthlyEssentialExpenses).toFixed(1) : null;
   const lastCheckIn = checkIns[0];
+  const debtPlan = plan?.results?.debt?.[plan.inputs.debtStrategy ?? 'avalanche'];
 
   return (
     <>
@@ -62,6 +64,12 @@ export default async function Dashboard() {
             <>
               <p className="text-xs text-muted">Version {plan.version}, saved by {plan.savedBy === 'agent' ? 'your agent' : 'you'}</p>
               <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{plan.summary}</p>
+              {debtPlan?.feasible && debtPlan.debtFreeMonth && (
+                <p className="mt-3 text-sm">Debt-free by <span className="font-semibold">{monthName(debtPlan.debtFreeMonth)}</span></p>
+              )}
+              {plan.results?.emergencyFund.targetReachedMonth && (
+                <p className="text-sm">Emergency fund full by <span className="font-semibold">{monthName(plan.results.emergencyFund.targetReachedMonth)}</span></p>
+              )}
             </>
           ) : (
             <Empty>No plan yet.</Empty>

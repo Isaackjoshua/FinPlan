@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 if (existsSync('../../.env')) process.loadEnvFile('../../.env');
 
 const config: NextConfig = {
-  transpilePackages: ['@fin/core', '@fin/db'],
+  transpilePackages: ['@fin/calc', '@fin/core', '@fin/db'],
   serverExternalPackages: ['@node-rs/argon2', 'pg', 'nodemailer'],
   poweredByHeader: false,
   async headers() {

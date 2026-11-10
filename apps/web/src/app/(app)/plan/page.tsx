@@ -1,3 +1,4 @@
+import { PlanResultsView } from '@/components/plan-results';
 import { Empty, Field, Flash, humanise, PageHeader } from '@/components/ui';
 import { money, optionalMoney, run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
@@ -56,7 +57,8 @@ async function makeCurrent(form: FormData) {
 
 const when = (date: Date) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 
-function PlanDetails({ plan, currency, goalTitles }: { plan: PlanVersion; currency: string; goalTitles: Map<string, string> }) {
+function PlanDetails({ plan, currency, goalTitles: names }: { plan: PlanVersion; currency: string; goalTitles: Map<string, string> }) {
+  const goalTitles = names;
   const { inputs } = plan;
   const total = inputs.budget.reduce((sum, row) => sum + row.amountMinor, 0);
   return (
@@ -84,6 +86,7 @@ function PlanDetails({ plan, currency, goalTitles }: { plan: PlanVersion; curren
           <li key={g.goalId}>{goalTitles.get(g.goalId) ?? 'A goal'}: <span className="num text-ink">{formatAmount(g.amountMinor, currency)}</span> a month</li>
         ))}
       </ul>
+      {plan.results && <PlanResultsView results={plan.results} currency={currency} strategy={inputs.debtStrategy} names={names} />}
     </div>
   );
 }
@@ -92,9 +95,11 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const { userId, profile } = await requireProfile();
   const ctx = getCtx();
   const cur = profile.currency;
-  const [versions, goals, expenses] = await Promise.all([listPlanVersions(ctx, userId), listGoals(ctx, userId), listItems(ctx, userId, 'expense')]);
+  const [versions, goals, items] = await Promise.all([listPlanVersions(ctx, userId), listGoals(ctx, userId), listItems(ctx, userId)]);
+  const expenses = items.filter((i) => i.kind === 'expense');
   const current = versions.find((v) => v.isCurrent);
-  const goalTitles = new Map(goals.map((g) => [g.id, g.title]));
+  // One lookup for every id a plan can mention: goals and debts.
+  const goalTitles = new Map([...goals.map((g) => [g.id, g.title] as const), ...items.map((i) => [i.id, i.label] as const)]);
   const activeGoals = goals.filter((g) => g.status === 'active');
 
   // Start the form from the current plan, or from what the profile says is being spent now.

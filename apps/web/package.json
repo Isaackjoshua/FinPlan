@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@fin/calc": "workspace:*",
     "@fin/core": "workspace:*",
     "@fin/db": "workspace:*",
     "@node-rs/argon2": "^2.2.2",

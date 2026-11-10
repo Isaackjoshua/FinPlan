@@ -9,6 +9,8 @@ import {
   type Ctx,
 } from './context';
 import { openJson, sealJson } from './crypto';
+import { computePlanResults, type PlanResults } from './planResults';
+import { listGoals, listItems } from './profile';
 import { planVersionInput, type PlanInputs } from './schemas';
 
 const { plans, planVersions, planEvents } = schema;
@@ -16,8 +18,8 @@ const { plans, planVersions, planEvents } = schema;
 interface StoredPlan {
   summary: string;
   inputs: PlanInputs;
-  /** Filled in by the calculation engine from milestone 2. */
-  results: unknown | null;
+  /** Null only for versions saved before the calculation engine existed. */
+  results: PlanResults | null;
 }
 
 export interface PlanVersion extends StoredPlan {
@@ -46,7 +48,9 @@ export async function savePlanVersion(
   userId: string,
   actor: Actor,
   input: z.input<typeof planVersionInput>,
-): Promise<{ version: number }> {
+  /** The moment of saving; projections count from this month. Passed in so tests are repeatable. */
+  now: Date = new Date(),
+): Promise<{ version: number; results: PlanResults }> {
   const { summary, inputs, baseVersion } = planVersionInput.parse(input);
   return ctx.db.transaction(async (tx) => {
     const { current } = await lockPlan(tx, userId);
@@ -62,7 +66,14 @@ export async function savePlanVersion(
     const version = (latest?.n ?? 0) + 1;
     const id = crypto.randomUUID();
     const key = await getUserKey(ctx, userId, tx);
-    const stored: StoredPlan = { summary, inputs, results: null };
+    // Projections are worked out here, from the profile as it stands at this moment.
+    const results = computePlanResults(
+      await listItems(ctx, userId, undefined, tx),
+      await listGoals(ctx, userId, tx),
+      inputs,
+      now.toISOString().slice(0, 7),
+    );
+    const stored: StoredPlan = { summary, inputs, results };
 
     await tx.insert(planVersions).values({
       id,
@@ -70,6 +81,7 @@ export async function savePlanVersion(
       versionNumber: version,
       parentVersionId: current?.id ?? null,
       ...actorColumns(actor),
+      engineVersion: results.engineVersion,
       data: sealJson(key, aad(userId, id), stored),
     });
     await tx.update(plans).set({ currentVersionId: id }).where(eq(plans.userId, userId));
@@ -80,7 +92,7 @@ export async function savePlanVersion(
       toVersion: version,
       ...actorColumns(actor),
     });
-    return { version };
+    return { version, results };
   });
 }
 

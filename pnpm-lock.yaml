@@ -181,6 +181,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fin/calc':
+        specifier: workspace:*
+        version: link:../../packages/calc
       '@fin/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -236,6 +239,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@fin/calc':
+        specifier: workspace:*
+        version: link:../calc
       '@fin/db':
         specifier: workspace:*
         version: link:../db

@@ -149,8 +149,8 @@ describe('plans', () => {
   });
 
   it('numbers versions and makes the newest current', async () => {
-    expect(await savePlanVersion(ctx, alice, USER, planInput('First plan'))).toEqual({ version: 1 });
-    expect(await savePlanVersion(ctx, alice, AGENT, planInput('Agent rewrite'))).toEqual({ version: 2 });
+    expect(await savePlanVersion(ctx, alice, USER, planInput('First plan'))).toMatchObject({ version: 1 });
+    expect(await savePlanVersion(ctx, alice, AGENT, planInput('Agent rewrite'))).toMatchObject({ version: 2 });
     const current = await getCurrentPlan(ctx, alice);
     expect(current).toMatchObject({ version: 2, summary: 'Agent rewrite', savedBy: 'agent', isCurrent: true });
     expect(current!.inputs).toMatchObject({ debtStrategy: 'avalanche', emergencyFundMonths: 3, extraDebtPaymentMinor: 0 });
@@ -166,7 +166,7 @@ describe('plans', () => {
     await revertToVersion(ctx, alice, 2);
     expect((await getCurrentPlan(ctx, alice))!.version).toBe(2);
     await revertToVersion(ctx, alice, 1);
-    expect(await savePlanVersion(ctx, alice, USER, planInput('Third'))).toEqual({ version: 3 });
+    expect(await savePlanVersion(ctx, alice, USER, planInput('Third'))).toMatchObject({ version: 3 });
   });
 
   it('records who made which version current', async () => {
@@ -183,7 +183,7 @@ describe('plans', () => {
 
   it('rejects a save based on a stale version', async () => {
     await expect(savePlanVersion(ctx, alice, AGENT, { ...planInput('Stale'), baseVersion: 1 })).rejects.toThrow(ConflictError);
-    expect(await savePlanVersion(ctx, alice, AGENT, { ...planInput('Fresh'), baseVersion: 3 })).toEqual({ version: 4 });
+    expect(await savePlanVersion(ctx, alice, AGENT, { ...planInput('Fresh'), baseVersion: 3 })).toMatchObject({ version: 4 });
   });
 
   it('gives concurrent saves distinct version numbers', async () => {

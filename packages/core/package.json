@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@fin/calc": "workspace:*",
     "@fin/db": "workspace:*",
     "zod": "^4.6.7"
   }
