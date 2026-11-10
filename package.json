@@ -12,7 +12,8 @@
     "dev": "pnpm --filter @fin/web dev",
     "build": "pnpm --filter @fin/web build",
     "test": "vitest run",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

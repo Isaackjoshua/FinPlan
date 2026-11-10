@@ -127,6 +127,12 @@ Columns marked **enc** are encrypted in the application before they reach the da
 
 ### Financial profile
 
+*As built in milestone 1:* income sources, expenses, debts and savings accounts share one table,
+`profile_items` (`kind` plus one encrypted `data` column holding every other field), and each
+other table likewise keeps its private fields in a single encrypted `data` column. This encrypts
+more than the per-column layout below (categories and frequencies too) for less code. The table
+below still describes the fields. Data export and account deletion move to milestone 5.
+
 | Table | Key columns |
 |---|---|
 | `profiles` | user_id, currency, country, pay_frequency, household_size, notes **enc**, revision |
