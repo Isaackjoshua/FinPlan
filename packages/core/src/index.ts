@@ -8,3 +8,5 @@ export * from './planResults';
 export * from './checkins';
 export * from './summary';
 export * from './warnings';
+export * from './content';
+export * from './lessons';
