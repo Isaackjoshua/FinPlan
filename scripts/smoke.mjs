@@ -109,5 +109,27 @@ check('check-in with reversed dates rejected', (await submit('/check-ins', has('
 await submit('/check-ins', has('periodStart'), { periodStart: '2026-10-01', periodEnd: '2026-10-31', income: '120000', 'spend.housing': '45000', 'spend.food': '24000', debt: '8000', savings: '10000', note: 'Food ran over' });
 check('check-in listed with variance', txt((await get('/check-ins')).html).includes('KES 4,000.00 over'));
 
+// Lessons. This profile has a 36% loan, so interest should lead the suggestions.
+let lessons = txt((await get('/lessons')).html);
+check('lessons page lists the catalogue', lessons.includes('0 of 10 completed') && lessons.includes('Your first budget'));
+const suggested = lessons.slice(lessons.indexOf('Suggested for your situation'), lessons.indexOf('All lessons'));
+check('suggestions fit a profile with expensive debt', suggested.includes('How interest works'), suggested.slice(0, 300));
+check('filters narrow the list', !txt((await get('/lessons?topic=debt&level=3')).html).split('All lessons')[1].includes('Your first budget'));
+check('unknown lesson is a 404', (await get('/lessons/does-not-exist')).status === 404);
+const lessonPath = '/lessons/how-interest-works';
+check('lesson page renders the worked example', txt((await get(lessonPath)).html).includes('2% of 10,000 is 200'));
+check('opening a lesson marks it in progress', txt((await get('/lessons')).html).includes('In progress'));
+check('unanswered quiz is rejected', (await submit(lessonPath, has('q0'), {})).includes('error='));
+await submit(lessonPath, has('q0'), { q0: '0', q1: '0', q2: '0' });
+let result = txt((await get(lessonPath + '?result=1')).html);
+check('wrong answers get feedback and do not complete', result.includes('0 of 3 correct') && result.includes('try again') && result.includes('1% of 50,000 is 500'));
+await submit(lessonPath, has('q0'), { q0: '1', q1: '2', q2: '1' });
+result = txt((await get(lessonPath + '?result=1')).html);
+check('right answers complete the lesson', result.includes('3 of 3 correct') && result.includes('Lesson completed'));
+lessons = txt((await get('/lessons')).html);
+check('progress is counted', lessons.includes('1 of 10 completed'));
+check('a completed lesson is no longer suggested', !lessons.slice(lessons.indexOf('Suggested for your situation'), lessons.indexOf('All lessons')).includes('How interest works'));
+check('dashboard shows lesson progress', txt((await get('/dashboard')).html).includes('1 of 10 completed'));
+
 await submit('/dashboard', (f) => f.body.includes('Sign out'), {});
 check('signed out', (await get('/dashboard')).url.startsWith('/sign-in'));

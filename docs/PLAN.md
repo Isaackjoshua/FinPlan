@@ -159,6 +159,13 @@ who did it. No history is destroyed, so a revert can itself be reverted.
 
 ### Literacy
 
+*As built in milestone 3:* lesson content lives in code (`packages/core/src/content`), not in the
+database, and lessons are identified by slug. Content is then reviewed and versioned like any
+other change, needs no seeding step, and a test checks every figure a lesson quotes against the
+calculation engine. The cost is that editing a lesson needs a deploy. The `lessons`, `lesson_tags`
+and `quiz_questions` tables below were therefore not created; the three per-user tables were.
+Lessons are written without a currency so they read the same in any market.
+
 | Table | Key columns |
 |---|---|
 | `lessons` | slug, title, topic, difficulty (1 to 3), est_minutes, body_md, version, published_at |

@@ -11,7 +11,7 @@ The design, data model and milestones are in [docs/PLAN.md](docs/PLAN.md).
 |---|---|
 | 1. Core platform (accounts, profile, goals, versioned plans, check-ins, dashboard) | Done |
 | 2. Calculation engine (budget, debt payoff, emergency fund, savings projection) | Done |
-| 3. Literacy module | Not started |
+| 3. Literacy module (lessons, quizzes, progress, suggestions) | Done |
 | 4. MCP server and OAuth | Not started |
 | 5. Agent management page | Not started |
 
@@ -44,9 +44,10 @@ pnpm smoke        # walks through the real pages end to end
 ## Layout
 
 ```
-apps/web        Next.js app: sign-up, dashboard, profile, goals, plan, check-ins
+apps/web        Next.js app: sign-up, dashboard, profile, goals, plan, check-ins, lessons
 packages/calc   Calculation engine: pure functions, no I/O, no dependencies
 packages/core   Domain logic. The only code that reads or writes financial data
+                Lesson content is in packages/core/src/content
 packages/db     Database schema and migrations
 scripts/        End-to-end smoke test
 ```
