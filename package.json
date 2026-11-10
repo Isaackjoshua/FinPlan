@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.11.2",
-  "engines": { "node": ">=22.19" },
+  "engines": {
+    "node": ">=22.19"
+  },
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
@@ -12,11 +14,13 @@
     "dev": "pnpm --filter @fin/web dev",
     "build": "pnpm --filter @fin/web build",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "pnpm -r typecheck",
     "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }
