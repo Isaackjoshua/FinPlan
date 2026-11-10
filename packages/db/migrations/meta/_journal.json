@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794298962836,
+      "tag": "0000_blue_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794298969258,
+      "tag": "0001_plan_versions_immutable",
+      "breakpoints": true
+    }
+  ]
+}
