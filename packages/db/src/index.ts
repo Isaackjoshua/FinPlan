@@ -1,6 +1,4 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import * as schema from './schema';
 
@@ -16,9 +14,3 @@ export function createDb(connectionString: string) {
 export type Db = ReturnType<typeof createDb>;
 /** A database handle or an open transaction; services accept either. */
 export type Executor = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
-
-export async function runMigrations(db: Db) {
-  await migrate(db, {
-    migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)),
-  });
-}

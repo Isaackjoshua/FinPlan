@@ -1,4 +1,5 @@
-import { createDb, runMigrations } from './index';
+import { createDb } from './index';
+import { runMigrations } from './migrator';
 
 const url = process.env.DATABASE_URL;
 if (!url) {

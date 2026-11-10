@@ -1,4 +1,5 @@
-import { createDb, runMigrations } from '@fin/db';
+import { createDb } from '@fin/db';
+import { runMigrations } from '@fin/db/migrator';
 import { existsSync } from 'node:fs';
 
 export default async function setup() {
