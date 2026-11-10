@@ -1,0 +1,31 @@
+{
+  "name": "@fin/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "next typegen && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fin/core": "workspace:*",
+    "@fin/db": "workspace:*",
+    "@node-rs/argon2": "^2.2.2",
+    "better-auth": "^1.7.19",
+    "next": "^16.4.6",
+    "nodemailer": "^7.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/nodemailer": "^7.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.5"
+  }
+}

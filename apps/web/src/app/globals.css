@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-ink: #17201c;
+  --color-muted: #5d6a64;
+  --color-line: #dfe5e1;
+  --color-paper: #f6f8f6;
+  --color-brand: #0f6b4f;
+  --color-brand-dark: #0a4f3a;
+  --color-warn: #9a5b00;
+  --color-danger: #a12a2a;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-line bg-white p-5; }
+  .label { @apply mb-1 block text-sm font-medium text-ink; }
+  .input { @apply block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20; }
+  .btn { @apply inline-flex cursor-pointer items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark; }
+  .btn-quiet { @apply inline-flex cursor-pointer items-center justify-center rounded-lg border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper; }
+  .link { @apply font-medium text-brand underline-offset-2 hover:underline; }
+  .num { @apply tabular-nums; }
+}
