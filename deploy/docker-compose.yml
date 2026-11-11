@@ -1,0 +1,60 @@
+# Production stack for a single server. Run from the repo root:
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+# Only Caddy is reachable from outside (ports 80 and 443). Postgres and the app
+# are on a private network.
+name: finplan
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finplan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: finplan
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finplan -d finplan"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: { context: .., target: migrate }
+    environment:
+      DATABASE_URL: postgres://finplan:${POSTGRES_PASSWORD}@postgres:5432/finplan
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  web:
+    build: { context: .., target: web }
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://finplan:${POSTGRES_PASSWORD}@postgres:5432/finplan
+      DATA_MASTER_KEY: ${DATA_MASTER_KEY:?set DATA_MASTER_KEY in deploy/.env}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in deploy/.env}
+      BETTER_AUTH_URL: https://${DOMAIN:?set DOMAIN in deploy/.env}
+      SMTP_URL: ${SMTP_URL:?set SMTP_URL in deploy/.env}
+      EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM in deploy/.env}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  caddy_data:

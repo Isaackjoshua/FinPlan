@@ -1,0 +1,6 @@
+# Caddy obtains and renews the HTTPS certificate for this name automatically.
+{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:3000
+}

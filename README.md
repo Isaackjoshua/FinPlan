@@ -41,6 +41,10 @@ pnpm build && pnpm --filter @fin/web start   # then, in another terminal:
 pnpm smoke        # walks through the real pages end to end
 ```
 
+## Deploying
+
+See [docs/DEPLOY.md](docs/DEPLOY.md) for running it on a single server with HTTPS.
+
 ## Layout
 
 ```
@@ -50,6 +54,7 @@ packages/core   Domain logic. The only code that reads or writes financial data
                 Lesson content is in packages/core/src/content
 packages/db     Database schema and migrations
 scripts/        End-to-end smoke test
+deploy/         Production Docker Compose stack and Caddy config
 ```
 
 ## Handling of financial data
