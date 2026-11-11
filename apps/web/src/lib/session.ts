@@ -7,7 +7,10 @@ import { getAuth } from './auth';
 import { getCtx } from './server';
 
 export const getSessionUser = cache(async () => {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read the request first: that tells Next this page is per-request, so it is never
+  // pre-rendered at build time (when there is no database to talk to).
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   return session?.user ?? null;
 });
 
