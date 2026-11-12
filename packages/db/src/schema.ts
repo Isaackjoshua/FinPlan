@@ -1,4 +1,5 @@
 import {
+  bigserial,
   boolean,
   date,
   index,
@@ -295,3 +296,109 @@ export const quizAttempts = pgTable(
   },
   (t) => [index('quiz_attempts_user_lesson').on(t.userId, t.lessonSlug, t.createdAt)],
 );
+
+// ---------------------------------------------------------------------------
+// Agents. An AI app reaches a user's data only through a connection the user
+// approved. Nothing here holds financial values.
+// ---------------------------------------------------------------------------
+
+/**
+ * Storage for the OAuth server (clients, consent grants, codes, tokens).
+ * Access tokens, refresh tokens and codes are keyed by a hash of their value, so
+ * a copy of this table cannot be used to call the MCP server.
+ */
+export const oauthRecords = pgTable(
+  'oauth_records',
+  {
+    model: text('model').notNull(),
+    id: text('id').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    grantId: text('grant_id'),
+    uid: text('uid'),
+    userCode: text('user_code'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [
+    primaryKey({ columns: [t.model, t.id] }),
+    index('oauth_records_grant_idx').on(t.grantId),
+    index('oauth_records_uid_idx').on(t.uid),
+    index('oauth_records_expires_idx').on(t.expiresAt),
+  ],
+);
+
+/** One row each time a user approves an AI app. This is what the agents page lists. */
+export const agentConnections = pgTable(
+  'agent_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').notNull(),
+    /** As reported by the app itself; shown to the user, never trusted. */
+    clientName: text('client_name').notNull(),
+    /** The OAuth grant behind this connection; its tokens carry the same id. */
+    grantId: text('grant_id').notNull().unique(),
+    scopes: text('scopes').array().notNull(),
+    createdAt,
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [index('agent_connections_user_idx').on(t.userId, t.createdAt)],
+);
+
+export const activityOutcome = pgEnum('activity_outcome', ['ok', 'denied', 'invalid', 'rate_limited', 'error']);
+
+/** Append-only record of every tool call. Holds names of things, never their values. */
+export const agentActivity = pgTable(
+  'agent_activity',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    connectionId: uuid('connection_id')
+      .notNull()
+      .references(() => agentConnections.id, { onDelete: 'cascade' }),
+    tool: text('tool').notNull(),
+    requiredScope: text('required_scope'),
+    outcome: activityOutcome('outcome').notNull(),
+    entityType: text('entity_type'),
+    entityId: text('entity_id'),
+    changedFields: text('changed_fields').array(),
+    durationMs: integer('duration_ms').notNull(),
+    createdAt,
+  },
+  (t) => [
+    index('agent_activity_user_idx').on(t.userId, t.createdAt),
+    index('agent_activity_connection_idx').on(t.connectionId, t.createdAt),
+  ],
+);
+
+/** Lets an agent repeat a write safely: the same key returns the first answer. */
+export const idempotencyKeys = pgTable(
+  'idempotency_keys',
+  {
+    connectionId: uuid('connection_id')
+      .notNull()
+      .references(() => agentConnections.id, { onDelete: 'cascade' }),
+    key: text('key').notNull(),
+    tool: text('tool').notNull(),
+    /** Hash of the arguments, so a key cannot be reused for a different request. */
+    requestHash: text('request_hash').notNull(),
+    /** Encrypted: the stored answer may include computed plan figures. Null while in flight. */
+    response: text('response'),
+    createdAt,
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.connectionId, t.key] }), index('idempotency_keys_expires_idx').on(t.expiresAt)],
+);
+
+/** Fixed-window counters for rate limits. */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull(),
+});

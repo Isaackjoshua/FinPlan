@@ -23,6 +23,7 @@ interface StoredPlan {
 }
 
 export interface PlanVersion extends StoredPlan {
+  id: string;
   version: number;
   savedAt: Date;
   savedBy: 'user' | 'agent';
@@ -132,6 +133,7 @@ export async function listPlanVersions(ctx: Ctx, userId: string): Promise<PlanVe
   const key = await getUserKey(ctx, userId);
   return rows.map((row) => ({
     ...openJson<StoredPlan>(key, aad(userId, row.id), row.data),
+    id: row.id,
     version: row.versionNumber,
     savedAt: row.createdAt,
     savedBy: row.actorType,

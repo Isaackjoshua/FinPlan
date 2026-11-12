@@ -159,6 +159,33 @@ export async function updateProfileDetails(
   });
 }
 
+async function writeItem(tx: Executor, key: Buffer, userId: string, data: ItemData, id?: string): Promise<string> {
+  if (id) {
+    const updated = await tx
+      .update(profileItems)
+      .set({ data: sealJson(key, aad.item(userId, id), data) })
+      // user_id is part of every WHERE clause: knowing an id is never enough.
+      .where(and(eq(profileItems.id, id), eq(profileItems.userId, userId), eq(profileItems.kind, data.kind), isNull(profileItems.archivedAt)))
+      .returning({ id: profileItems.id });
+    if (updated.length === 0) throw new NotFoundError(`Item ${id}`);
+    return id;
+  }
+  const newId = crypto.randomUUID();
+  await tx
+    .insert(profileItems)
+    .values({ id: newId, userId, kind: data.kind, data: sealJson(key, aad.item(userId, newId), data) });
+  return newId;
+}
+
+async function hideItem(tx: Executor, userId: string, id: string): Promise<void> {
+  const updated = await tx
+    .update(profileItems)
+    .set({ archivedAt: sql`now()` })
+    .where(and(eq(profileItems.id, id), eq(profileItems.userId, userId), isNull(profileItems.archivedAt)))
+    .returning({ id: profileItems.id });
+  if (updated.length === 0) throw new NotFoundError(`Item ${id}`);
+}
+
 /** Creates an item, or replaces one when `id` is given. An item cannot change kind. */
 export async function upsertItem(
   ctx: Ctx,
@@ -168,34 +195,65 @@ export async function upsertItem(
   options: WriteOptions = {},
 ) {
   const data = itemData.parse(input);
-  return mutate(ctx, userId, actor, options, async (tx, key) => {
-    if (input.id) {
-      const updated = await tx
-        .update(profileItems)
-        .set({ data: sealJson(key, aad.item(userId, input.id), data) })
-        // user_id is part of every WHERE clause: knowing an id is never enough.
-        .where(and(eq(profileItems.id, input.id), eq(profileItems.userId, userId), eq(profileItems.kind, data.kind)))
-        .returning({ id: profileItems.id });
-      if (updated.length === 0) throw new NotFoundError('Item');
-      return input.id;
-    }
-    const id = crypto.randomUUID();
-    await tx
-      .insert(profileItems)
-      .values({ id, userId, kind: data.kind, data: sealJson(key, aad.item(userId, id), data) });
-    return id;
-  });
+  return mutate(ctx, userId, actor, options, (tx, key) => writeItem(tx, key, userId, data, input.id));
 }
 
 /** Hides an item from the profile. Nothing is deleted. */
 export async function archiveItem(ctx: Ctx, userId: string, actor: Actor, id: string, options: WriteOptions = {}) {
-  return mutate(ctx, userId, actor, options, async (tx) => {
-    const updated = await tx
-      .update(profileItems)
-      .set({ archivedAt: sql`now()` })
-      .where(and(eq(profileItems.id, id), eq(profileItems.userId, userId), isNull(profileItems.archivedAt)))
-      .returning({ id: profileItems.id });
-    if (updated.length === 0) throw new NotFoundError('Item');
+  return mutate(ctx, userId, actor, options, (tx) => hideItem(tx, userId, id));
+}
+
+export type ItemChange =
+  | { op: 'upsert'; id?: string; item: z.input<typeof itemData> }
+  | { op: 'archive'; id: string };
+
+export interface ProfileChangeResult {
+  created: { id: string; kind: ItemKind }[];
+  updated: string[];
+  archived: string[];
+  /** Names of the profile details that were given. */
+  details: string[];
+}
+
+/**
+ * Applies several changes as one step: all of them happen or none do, the revision
+ * moves once, and (for an agent) one snapshot is kept to undo the lot.
+ */
+export async function applyProfileChanges(
+  ctx: Ctx,
+  userId: string,
+  actor: Actor,
+  input: { details?: z.input<typeof profileDetails>; changes?: ItemChange[] },
+  options: WriteOptions = {},
+) {
+  const changes = (input.changes ?? []).map((change) =>
+    change.op === 'upsert' ? { ...change, item: itemData.parse(change.item) } : change,
+  );
+  const details = input.details ? profileDetails.parse(input.details) : undefined;
+  return mutate<ProfileChangeResult>(ctx, userId, actor, options, async (tx, key) => {
+    const result: ProfileChangeResult = { created: [], updated: [], archived: [], details: [] };
+    if (details) {
+      const [row] = await tx.select().from(profiles).where(eq(profiles.userId, userId));
+      const current = openJson<ProfileDetails>(key, aad.profile(userId), row!.data);
+      // Only the fields that were given change; the rest keep their values.
+      const given = Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined));
+      await tx
+        .update(profiles)
+        .set({ data: sealJson(key, aad.profile(userId), { ...current, ...given }) })
+        .where(eq(profiles.userId, userId));
+      result.details = Object.keys(given);
+    }
+    for (const change of changes) {
+      if (change.op === 'archive') {
+        await hideItem(tx, userId, change.id);
+        result.archived.push(change.id);
+      } else if (change.id) {
+        result.updated.push(await writeItem(tx, key, userId, change.item, change.id));
+      } else {
+        result.created.push({ id: await writeItem(tx, key, userId, change.item), kind: change.item.kind });
+      }
+    }
+    return result;
   });
 }
 
