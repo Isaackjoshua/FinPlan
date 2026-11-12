@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, schema, sql, type Db } from '@fin/db';
+import { and, desc, eq, gt, isNull, lt, or, schema, sql, type Db, type Executor } from '@fin/db';
 import { createHash } from 'node:crypto';
 import { ConflictError, getUserKey, NotFoundError, type Ctx } from './context';
 import { openJson, sealJson } from './crypto';
@@ -22,6 +22,13 @@ export const HASHED_MODELS: ReadonlySet<string> = new Set(['AccessToken', 'Refre
 // An app's name is whatever the app says it is. Keep it short and printable.
 const cleanName = (name: string | undefined) =>
   (name ?? '').replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 80) || 'Unnamed app';
+
+/** Removes a consent grant and every code and token issued under it. */
+async function deleteGrant(exec: Executor, grantId: string): Promise<void> {
+  await exec
+    .delete(oauthRecords)
+    .where(or(eq(oauthRecords.grantId, grantId), and(eq(oauthRecords.model, 'Grant'), eq(oauthRecords.id, grantId))));
+}
 
 // --- Connections ---------------------------------------------------------------
 
@@ -58,7 +65,7 @@ export async function recordConsent(
         ),
       )
       .returning({ grantId: agentConnections.grantId });
-    for (const { grantId } of earlier) await tx.delete(oauthRecords).where(eq(oauthRecords.grantId, grantId));
+    for (const { grantId } of earlier) await deleteGrant(tx, grantId);
 
     const [row] = await tx
       .insert(agentConnections)
@@ -100,7 +107,7 @@ export async function revokeConnection(ctx: DbOnly, userId: string, connectionId
       // Scoped by user: knowing a connection id is never enough to revoke it.
       .where(and(eq(agentConnections.id, connectionId), eq(agentConnections.userId, userId)));
     if (!row) throw new NotFoundError('Connection');
-    await tx.delete(oauthRecords).where(eq(oauthRecords.grantId, row.grantId));
+    await deleteGrant(tx, row.grantId);
     if (!row.revokedAt) {
       await tx.update(agentConnections).set({ revokedAt: sql`now()` }).where(eq(agentConnections.id, row.id));
     }
