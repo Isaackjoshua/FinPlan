@@ -10,6 +10,7 @@ const NAV = [
   ['/plan', 'Plan'],
   ['/check-ins', 'Check-ins'],
   ['/lessons', 'Lessons'],
+  ['/agents', 'AI apps'],
 ] as const;
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -25,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <form action={signOut} className="ml-auto flex items-center gap-3 text-sm text-muted">
-            <span className="hidden sm:inline">{name}</span>
+            <Link href="/account" className="hidden hover:text-ink sm:inline">{name}</Link>
             <button className="btn-quiet">Sign out</button>
           </form>
         </div>

@@ -2,21 +2,12 @@
 
 import { finishConsent } from '@/lib/authServer';
 import { back } from '@/lib/forms';
+import { passwordMatches } from '@/lib/password';
 import { getCtx } from '@/lib/server';
 import { getSessionUser } from '@/lib/session';
 import { hitRateLimit } from '@fin/core';
-import { and, eq, schema } from '@fin/db';
-import { verify } from '@node-rs/argon2';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-
-async function passwordMatches(userId: string, password: string): Promise<boolean> {
-  const [account] = await getCtx()
-    .db.select({ hash: schema.account.password })
-    .from(schema.account)
-    .where(and(eq(schema.account.userId, userId), eq(schema.account.providerId, 'credential')));
-  return !!account?.hash && !!password && verify(account.hash, password);
-}
 
 export async function decide(form: FormData) {
   const uid = String(form.get('uid') ?? '');

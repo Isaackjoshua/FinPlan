@@ -12,3 +12,4 @@ export * from './content';
 export * from './lessons';
 export * from './agents';
 export * from './progress';
+export * from './account';

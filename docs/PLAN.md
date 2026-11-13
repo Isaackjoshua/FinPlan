@@ -420,6 +420,13 @@ log entries to the plan or profile revision.
 *Done when:* a Playwright test connects an agent, sees its calls in the log, revokes it, and the
 agent's next call fails with 401.
 
+*As built in milestone 5:* the page is `/agents` ("AI apps"). Undo of profile and goal changes is
+a "restore to before this" list on that page, fed by the snapshots taken before every agent write;
+plans are undone on the Plan page as before. Data export and account deletion are on `/account`.
+The completion test runs in `scripts/smoke.mjs` over plain HTTP, not in Playwright: every page
+works without JavaScript, so the script can connect an agent, read the log, disconnect, and see
+the next call fail with 401 without driving a browser.
+
 Note on order: this follows the order you listed. M1's plan screen stores plan inputs only until M2
 supplies the computed results. Building M2 first would avoid that brief gap; say so if you prefer.
 

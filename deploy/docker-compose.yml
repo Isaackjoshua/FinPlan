@@ -40,6 +40,7 @@ services:
       SMTP_URL: ${SMTP_URL:?set SMTP_URL in deploy/.env}
       EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM in deploy/.env}
       AUTH_INTERNAL_URL: http://auth:3002
+      MCP_URL: https://mcp.${DOMAIN}/mcp
       AUTH_INTERNAL_SECRET: ${AUTH_INTERNAL_SECRET:?set AUTH_INTERNAL_SECRET in deploy/.env}
     depends_on:
       migrate: { condition: service_completed_successfully }

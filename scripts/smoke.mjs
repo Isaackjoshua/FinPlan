@@ -219,5 +219,39 @@ check('signing in returns to the consent page', (await submit(asStranger.url, ha
 jar.clear(); for (const [k, v] of signedInCookies) jar.set(k, v);
 check('an unknown consent link shows an expiry message', txt((await get('/connect/aaaaaaaaaaaaaaaaaaaaaaaa')).html).includes('This request has expired'));
 
+// The AI apps page: see what the app did, undo it, disconnect it.
+const rev = (await callTool(agentToken, 'get_profile')).body.structuredContent.revision;
+const invented = await callTool(agentToken, 'update_profile', { expected_revision: rev, items: [{ op: 'upsert', item: { kind: 'income', label: 'Bonus nobody mentioned', amount_minor: 5_000_000, frequency: 'monthly' } }] });
+check('agent changes the profile', invented.body?.structuredContent?.revision === rev + 1, JSON.stringify(invented.body).slice(0, 200));
+check('the website shows the change', txt((await get('/dashboard')).html).includes('KES 170,000.00'));
+let agentsPage = (await get('/agents')).html;
+let agentsText = txt(agentsPage);
+check('AI apps page gives the address to connect with', agentsText.includes(MCP));
+check('it lists the connected app and what it may do', agentsPage.includes('Smoke &lt;b&gt;Agent&lt;/b&gt;') && !agentsPage.includes('<b>Agent</b>') && agentsText.includes('See your information · Make changes'));
+const logText = agentsText.slice(agentsText.indexOf('Every request an app makes'));
+check('activity log shows what was done and what was refused', logText.includes('Save plan version') && logText.includes('Update profile') && logText.includes('Refused: no permission') && logText.includes('Plan version 3'), logText.slice(0, 400));
+check('activity log holds no amounts or labels', !logText.includes('5000000') && !logText.includes('50,000') && !logText.includes('Bonus nobody'));
+const refusedOnly = txt((await get('/agents?outcome=denied')).html);
+check('the log can be filtered', refusedOnly.slice(refusedOnly.indexOf('Every request an app makes')).includes('Create goal') && !refusedOnly.slice(refusedOnly.indexOf('Every request an app makes')).includes('Save plan version'));
+check('the user undoes the app\'s profile change', (await submit('/agents', (f) => f.hidden.revision === String(rev), {})).includes('notice='));
+check('the profile is back as it was', txt((await get('/dashboard')).html).includes('KES 120,000.00'));
+check('disconnecting an app', (await submit('/agents', (f) => !!f.hidden.id && f.body.includes('Disconnect'), {})).includes('notice='));
+check('the disconnected app is refused at once', (await callTool(agentToken, 'get_profile')).status === 401);
+check('no app is listed as connected', txt((await get('/agents')).html).includes('No app is connected.'));
+
+// Your data: download it.
+const exported = JSON.parse((await get('/account/export')).html);
+check('export contains the account, profile, plans and app history', exported.account.email === email && exported.profile.currency === 'KES' && exported.items.length === 5 && exported.planVersions.length === 3 && exported.connectedApps.length >= 1 && exported.recentAppActivity.length > 0, JSON.stringify(Object.keys(exported)));
+check('export holds the real figures', exported.items.some((item) => item.label === 'Salary' && item.amountMinor === 12_000_000));
+
 await submit('/dashboard', (f) => f.body.includes('Sign out'), {});
 check('signed out', (await get('/dashboard')).url.startsWith('/sign-in'));
+check('export needs a signed-in user', (await get('/account/export')).status === 401);
+
+// Deleting the account removes everything.
+await submit('/sign-in', has('email'), { email, password });
+check('deleting needs the confirmation tick', (await submit('/account', has('confirm'), { password })).includes('error='));
+check('deleting needs the right password', (await submit('/account', has('confirm'), { password: 'not my password', confirm: 'on' })).includes('error='));
+check('account deleted', (await submit('/account', has('confirm'), { password, confirm: 'on' })).includes('have been deleted'));
+check('the session is gone', (await get('/dashboard')).url.startsWith('/sign-in'));
+check('the account no longer exists', (await submit('/sign-in', has('email'), { email, password })).includes('error='));

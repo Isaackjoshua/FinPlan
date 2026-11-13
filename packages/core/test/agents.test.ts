@@ -14,7 +14,14 @@ import {
   idempotent,
   listActivity,
   listConnections,
+  listGoals,
   listItems,
+  listProfileRevisions,
+  restoreProfileRevision,
+  createGoal,
+  deleteAccount,
+  exportUserData,
+  updateGoal,
   logActivity,
   markGrantRevoked,
   NotFoundError,
@@ -271,6 +278,82 @@ describe('batched profile changes', () => {
     const { result: bobsItem } = await upsertItem(ctx, bob, USER, salary);
     await expect(applyProfileChanges(ctx, alice, AGENT, { changes: [{ op: 'archive', id: bobsItem }] })).rejects.toBeInstanceOf(NotFoundError);
     await expect(applyProfileChanges(ctx, alice, AGENT, { changes: [{ op: 'upsert', id: bobsItem, item: salary }] })).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('undoing an agent\'s profile changes', () => {
+  const AGENT: Actor = { type: 'agent', connectionId: null };
+
+  it('restores details, items and goals, deletes nothing, and can itself be undone', async () => {
+    const user = await createUser(ctx);
+    await setupProfile(ctx, user, { country: 'KE', currency: 'KES' });
+    const other = await createUser(ctx);
+    await setupProfile(ctx, other, { country: 'KE', currency: 'KES' });
+    const { result: rentId } = await upsertItem(ctx, user, USER, { kind: 'expense', label: 'Rent', amountMinor: 40_000, frequency: 'monthly', category: 'housing', essential: true });
+    const { result: gymId } = await upsertItem(ctx, user, USER, { kind: 'expense', label: 'Gym', amountMinor: 3_000, frequency: 'monthly', category: 'personal', essential: false });
+    const { result: goalId } = await createGoal(ctx, user, USER, { kind: 'other', title: 'Laptop', targetAmountMinor: 90_000 });
+    await applyProfileChanges(ctx, user, USER, { details: { householdSize: 2 } });
+    const before = (await getProfile(ctx, user))!.revision;
+
+    // The agent makes a mess across three calls.
+    await applyProfileChanges(ctx, user, AGENT, {
+      details: { householdSize: 9, notes: 'wrong' },
+      changes: [
+        { op: 'upsert', id: rentId, item: { kind: 'expense', label: 'Rent', amountMinor: 1, frequency: 'monthly', category: 'housing', essential: true } },
+        { op: 'archive', id: gymId },
+        { op: 'upsert', item: { kind: 'income', label: 'Invented income', amountMinor: 999, frequency: 'monthly' } },
+      ],
+    });
+    await updateGoal(ctx, user, AGENT, goalId, { title: 'Changed', status: 'achieved' });
+    await createGoal(ctx, user, AGENT, { kind: 'other', title: 'Invented goal', targetAmountMinor: 5 });
+
+    const history = await listProfileRevisions(ctx, user);
+    expect(history.map((h) => [h.revision, h.madeBy])).toEqual([[before + 2, 'agent'], [before + 1, 'agent'], [before, 'agent']]);
+    await expect(restoreProfileRevision(ctx, other, before)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(restoreProfileRevision(ctx, user, 9999)).rejects.toBeInstanceOf(NotFoundError);
+
+    const { revision } = await restoreProfileRevision(ctx, user, before);
+    expect(revision).toBe(before + 4);
+    expect(await getProfile(ctx, user)).toMatchObject({ householdSize: 2 });
+    expect((await getProfile(ctx, user))!.notes).toBeUndefined();
+    expect((await listItems(ctx, user)).map((i) => [i.label, 'amountMinor' in i ? i.amountMinor : null])).toEqual([['Rent', 40_000], ['Gym', 3_000]]);
+    expect((await listGoals(ctx, user)).map((g) => [g.title, g.status])).toEqual([['Laptop', 'active'], ['Invented goal', 'abandoned']]);
+    // Nothing was deleted: the invented item is hidden, not gone.
+    expect(await ctx.db.select().from(schema.profileItems).where(eq(schema.profileItems.userId, user))).toHaveLength(3);
+
+    // The restore saved what it replaced, so it can be reversed.
+    const [latest] = await listProfileRevisions(ctx, user);
+    expect(latest).toMatchObject({ revision: before + 3, madeBy: 'user' });
+    await restoreProfileRevision(ctx, user, before + 3);
+    expect((await listItems(ctx, user)).map((i) => i.label).sort()).toEqual(['Invented income', 'Rent']);
+    expect((await listGoals(ctx, user)).map((g) => [g.title, g.status])).toEqual([['Changed', 'achieved'], ['Invented goal', 'active']]);
+  });
+});
+
+describe('export and account deletion', () => {
+  it('exports only the user\'s own data, and deletion removes every trace', async () => {
+    const user = await createUser(ctx);
+    await setupProfile(ctx, user, { country: 'KE', currency: 'KES' });
+    await upsertItem(ctx, user, USER, { kind: 'income', label: 'Export me', amountMinor: 424_242, frequency: 'monthly' });
+    await upsertItem(ctx, bob, USER, { kind: 'income', label: 'Bob private', amountMinor: 171_717, frequency: 'monthly' });
+    const { grantId, connectionId } = await connect(user, ['finance:read']);
+    const token = await issueToken({ userId: user, grantId, scope: 'finance:read' });
+    await logActivity(ctx, { userId: user, connectionId, tool: 'get_profile', outcome: 'ok', durationMs: 1 });
+
+    const exported = JSON.stringify(await exportUserData(ctx, user));
+    expect(exported).toContain('Export me');
+    expect(exported).toContain('424242');
+    expect(exported).not.toContain('Bob private');
+    expect(exported).not.toContain(token);
+
+    await deleteAccount(ctx, user);
+    expect(await authenticateToken(ctx, token, MCP)).toBeNull();
+    for (const table of [schema.profiles, schema.profileItems, schema.userKeys, schema.agentConnections, schema.agentActivity]) {
+      expect(await ctx.db.select().from(table).where(eq(table.userId, user))).toHaveLength(0);
+    }
+    expect(await ctx.db.select().from(schema.oauthRecords).where(eq(schema.oauthRecords.grantId, grantId))).toHaveLength(0);
+    // Other users are untouched.
+    expect((await listItems(ctx, bob)).some((item) => item.label === 'Bob private')).toBe(true);
   });
 });
 

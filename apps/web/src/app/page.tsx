@@ -1,11 +1,13 @@
+import { Flash } from '@/components/ui';
 import { getSessionUser } from '@/lib/session';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   if (await getSessionUser()) redirect('/dashboard');
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-16">
+      <Flash searchParams={searchParams} />
       <p className="text-sm font-semibold text-brand">FinPlan</p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">A financial plan you build with your own AI agent.</h1>
       <p className="mt-4 text-lg text-muted">

@@ -13,7 +13,7 @@ The design, data model and milestones are in [docs/PLAN.md](docs/PLAN.md).
 | 2. Calculation engine (budget, debt payoff, emergency fund, savings projection) | Done |
 | 3. Literacy module (lessons, quizzes, progress, suggestions) | Done |
 | 4. MCP server and OAuth (19 tools, read and write scopes, consent screen, rate limits, activity log) | Built and tested with the official MCP client and MCP Inspector. Still to do: connect Claude and ChatGPT by hand, which needs a public address |
-| 5. Agent management page | Not started |
+| 5. AI apps page (connect instructions, connected apps, disconnect, undo, activity log), data export, account deletion | Built and covered by the end-to-end script |
 
 ## Run it locally
 

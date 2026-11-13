@@ -208,7 +208,11 @@ export async function logActivity(ctx: DbOnly, entry: ActivityEntry): Promise<vo
   });
 }
 
-export async function listActivity(ctx: DbOnly, userId: string, options: { connectionId?: string; limit?: number } = {}) {
+export async function listActivity(
+  ctx: DbOnly,
+  userId: string,
+  options: { connectionId?: string; outcome?: ActivityOutcome; limit?: number } = {},
+) {
   return ctx.db
     .select()
     .from(agentActivity)
@@ -216,11 +220,14 @@ export async function listActivity(ctx: DbOnly, userId: string, options: { conne
       and(
         eq(agentActivity.userId, userId),
         options.connectionId ? eq(agentActivity.connectionId, options.connectionId) : undefined,
+        options.outcome ? eq(agentActivity.outcome, options.outcome) : undefined,
       ),
     )
     .orderBy(desc(agentActivity.id))
     .limit(Math.min(options.limit ?? 50, 200));
 }
+
+export const ACTIVITY_OUTCOMES = schema.activityOutcome.enumValues;
 
 // --- Rate limits ---------------------------------------------------------------
 

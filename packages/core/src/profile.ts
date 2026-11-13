@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, schema, sql, type Executor } from '@fin/db';
+import { and, asc, desc, eq, isNull, schema, sql, type Executor } from '@fin/db';
 import type { z } from 'zod';
 import {
   actorColumns,
@@ -99,6 +99,8 @@ export async function setupProfile(ctx: Ctx, userId: string, input: z.input<type
 export interface WriteOptions {
   /** Reject the write unless the profile is still at this revision. */
   expectedRevision?: number;
+  /** Keep a snapshot of the state before this write even though the writer is the user. */
+  snapshot?: boolean;
 }
 
 /**
@@ -122,7 +124,7 @@ async function mutate<T>(
     }
     const key = await getUserKey(ctx, userId, tx);
 
-    if (actor.type === 'agent') {
+    if (actor.type === 'agent' || options.snapshot) {
       const snapshot = {
         profile: await getProfile(ctx, userId, tx),
         items: await listItems(ctx, userId, undefined, tx),
@@ -294,5 +296,79 @@ export async function updateGoal(
       })
       .where(and(eq(goals.id, id), eq(goals.userId, userId)));
     return Object.keys(changes);
+  });
+}
+
+// --- Undoing changes -----------------------------------------------------------
+
+interface Snapshot {
+  profile: Profile | null;
+  items: Item[];
+  goals: Goal[];
+}
+
+export interface ProfileRevision {
+  /** The profile's revision number just before the change. */
+  revision: number;
+  madeBy: 'user' | 'agent';
+  connectionId: string | null;
+  at: Date;
+}
+
+/** The saved "before" states, newest first. One exists for every change an agent made. */
+export async function listProfileRevisions(ctx: Ctx, userId: string, limit = 50): Promise<ProfileRevision[]> {
+  const rows = await ctx.db
+    .select({ revision: profileRevisions.revision, madeBy: profileRevisions.actorType, connectionId: profileRevisions.connectionId, at: profileRevisions.createdAt })
+    .from(profileRevisions)
+    .where(eq(profileRevisions.userId, userId))
+    .orderBy(desc(profileRevisions.revision))
+    .limit(limit);
+  return rows;
+}
+
+/**
+ * Puts the profile, its items and goals back to how they were at `revision`, undoing
+ * that change and everything after it. Only ever called on behalf of the signed-in
+ * user. Nothing is deleted: items added since are hidden and goals added since are
+ * marked abandoned, and the state being replaced is itself saved, so a restore can
+ * be undone the same way.
+ */
+export async function restoreProfileRevision(ctx: Ctx, userId: string, revision: number) {
+  return mutate(ctx, userId, { type: 'user' }, { snapshot: true }, async (tx, key) => {
+    const [row] = await tx
+      .select()
+      .from(profileRevisions)
+      .where(and(eq(profileRevisions.userId, userId), eq(profileRevisions.revision, revision)));
+    if (!row) throw new NotFoundError('Profile revision');
+    const snapshot = openJson<Snapshot>(key, aad.revision(userId, revision), row.data);
+
+    if (snapshot.profile) {
+      const { country: _country, currency: _currency, revision: _revision, ...details } = snapshot.profile;
+      await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), details) }).where(eq(profiles.userId, userId));
+    }
+
+    const keptItems = new Set(snapshot.items.map((item) => item.id));
+    for (const { id, ...data } of snapshot.items) {
+      await tx
+        .update(profileItems)
+        .set({ data: sealJson(key, aad.item(userId, id), data), archivedAt: null })
+        .where(and(eq(profileItems.id, id), eq(profileItems.userId, userId)));
+    }
+    const liveItems = await tx.select({ id: profileItems.id }).from(profileItems).where(and(eq(profileItems.userId, userId), isNull(profileItems.archivedAt)));
+    for (const { id } of liveItems) {
+      if (!keptItems.has(id)) await tx.update(profileItems).set({ archivedAt: sql`now()` }).where(and(eq(profileItems.id, id), eq(profileItems.userId, userId)));
+    }
+
+    const keptGoals = new Set(snapshot.goals.map((goal) => goal.id));
+    for (const { id, status, ...data } of snapshot.goals) {
+      await tx
+        .update(goals)
+        .set({ data: sealJson(key, aad.goal(userId, id), data), status })
+        .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+    }
+    const allGoals = await tx.select({ id: goals.id }).from(goals).where(eq(goals.userId, userId));
+    for (const { id } of allGoals) {
+      if (!keptGoals.has(id)) await tx.update(goals).set({ status: 'abandoned' }).where(and(eq(goals.id, id), eq(goals.userId, userId)));
+    }
   });
 }
