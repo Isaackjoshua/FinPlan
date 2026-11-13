@@ -4,12 +4,15 @@ import { signIn } from '../actions';
 
 export const metadata = { title: 'Sign in' };
 
-export default function SignIn({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
+  const { next } = await searchParams;
   return (
     <>
       <h1 className="mb-4 text-2xl font-semibold">Sign in</h1>
       <Flash searchParams={searchParams} />
+      {next && <p className="mb-4 text-sm text-muted">Sign in to continue connecting your AI app.</p>}
       <form action={signIn} className="space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <Field label="Email"><input name="email" type="email" required autoComplete="email" className="input" /></Field>
         <Field label="Password"><input name="password" type="password" required autoComplete="current-password" className="input" /></Field>
         <button className="btn w-full">Sign in</button>

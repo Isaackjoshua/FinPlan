@@ -1,0 +1,28 @@
+{
+  "name": "@fin/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fin/calc": "workspace:*",
+    "@fin/core": "workspace:*",
+    "@fin/db": "workspace:*",
+    "@hono/node-server": "^2.1.7",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "hono": "^4.13.18",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@fin/auth": "workspace:*",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "tsx": "^4.23.15"
+  }
+}

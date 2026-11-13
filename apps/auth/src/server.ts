@@ -1,6 +1,6 @@
-import { hitRateLimit, isScope, recordConsent, SCOPES, type Scope } from '@fin/core';
+import { deriveSecret, hitRateLimit, isScope, recordConsent, SCOPES, type Scope } from '@fin/core';
 import { eq, schema, type Db } from '@fin/db';
-import { createHmac, generateKeyPairSync, timingSafeEqual } from 'node:crypto';
+import { generateKeyPairSync, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import Provider, { errors, type Configuration } from 'oidc-provider';
 import { createAdapter } from './adapter';
@@ -39,7 +39,7 @@ const DAY = 24 * 60 * MINUTE;
 export function createAuthServer(options: AuthServerOptions) {
   const { db, mcpUrl } = options;
   const issuer = new URL(options.issuer);
-  const secret = (label: string) => createHmac('sha256', options.internalSecret).update(label).digest('base64url');
+  const secret = (label: string) => deriveSecret(options.internalSecret, label);
   // Only ID tokens are signed, and none are issued for our scopes, so a key made at start-up is enough.
   const signingKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' });
 

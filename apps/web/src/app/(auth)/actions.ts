@@ -20,7 +20,12 @@ export async function signUp(form: FormData) {
   redirect('/check-email');
 }
 
+// After signing in, a user who came from an AI app goes back to approve it. No other destination is accepted.
+const safeNext = (value: string) => (/^\/connect\/[\w-]{10,100}$/.test(value) ? value : null);
+
 export async function signIn(form: FormData) {
+  const next = safeNext(str(form, 'next'));
+  const page = next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in';
   try {
     await getAuth().api.signInEmail({
       body: { email: str(form, 'email').toLowerCase(), password: String(form.get('password') ?? '') },
@@ -29,11 +34,11 @@ export async function signIn(form: FormData) {
   } catch (error) {
     if (error instanceof APIError) {
       if (error.status === 'FORBIDDEN') redirect('/check-email');
-      back('/sign-in', 'error', 'That email and password do not match an account.');
+      redirect(`${page}${next ? '&' : '?'}error=${encodeURIComponent('That email and password do not match an account.')}`);
     }
     throw error;
   }
-  redirect('/dashboard');
+  redirect(next ?? '/dashboard');
 }
 
 export async function signOut() {

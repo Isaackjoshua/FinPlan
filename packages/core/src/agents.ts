@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, isNull, lt, or, schema, sql, type Db, type Executor } from '@fin/db';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { ConflictError, getUserKey, NotFoundError, type Ctx } from './context';
 import { openJson, sealJson } from './crypto';
 
@@ -15,6 +15,9 @@ type DbOnly = { db: Db };
 
 /** Tokens are looked up by this hash; the token itself is never stored. */
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');
+
+/** One configured secret, several uses: each label gives an unrelated key. */
+export const deriveSecret = (secret: string, label: string) => createHmac('sha256', secret).update(label).digest('base64url');
 
 /** OAuth records that are secrets in themselves and are therefore stored under a hash. */
 export const HASHED_MODELS: ReadonlySet<string> = new Set(['AccessToken', 'RefreshToken', 'AuthorizationCode']);
