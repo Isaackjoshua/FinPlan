@@ -12,7 +12,7 @@ import {
 import { Hono } from 'hono';
 import { INSTRUCTIONS } from './instructions';
 import { TOOL_BY_NAME, TOOLS, type ToolAuth, type ToolDef, type Touched } from './tools';
-import { explain } from './wire';
+import { explain, portable } from './wire';
 
 export interface Limits {
   /** Requests of any kind, per connection. */
@@ -81,8 +81,8 @@ export function createMcpApp(options: McpAppOptions) {
         {
           title: def.title,
           description: def.description,
-          inputSchema: def.input,
-          outputSchema: def.output,
+          inputSchema: portable(def.input),
+          outputSchema: portable(def.output),
           annotations:
             def.kind === 'write'
               ? { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }

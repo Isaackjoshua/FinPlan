@@ -72,6 +72,8 @@ describe('what the server says about itself', () => {
       const def = TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.inputSchema, tool.name).toMatchObject({ type: 'object', additionalProperties: false });
       expect(tool.outputSchema, tool.name).toMatchObject({ type: 'object', additionalProperties: false });
+      // Schemas stick to the widely supported subset: no list-of-types fields.
+      expect(JSON.stringify([tool.inputSchema, tool.outputSchema]), tool.name).not.toMatch(/"type":\[/);
       expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
       expect(tool.annotations?.readOnlyHint, tool.name).toBe(def.kind !== 'write');
       if (def.kind === 'write') expect(tool.annotations?.destructiveHint, tool.name).toBe(false);

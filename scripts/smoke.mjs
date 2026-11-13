@@ -36,7 +36,7 @@ async function submit(path, pick, fields) {
   const form = forms(page.html).find((f) => pick(f));
   if (!form) throw new Error(`no matching form on ${path} (landed on ${page.url})`);
   const data = new FormData();
-  for (const [k, v] of Object.entries({ ...form.hidden, ...fields })) data.append(k, v);
+  for (const [k, v] of Object.entries({ ...form.hidden, ...fields })) for (const one of [v].flat()) data.append(k, one);
   const res = await fetch(new URL(page.url, BASE), { method: 'POST', body: data, redirect: 'manual', headers: { cookie: cookieHeader(), origin: BASE } });
   store(res);
   const loc = res.headers.get('location');
@@ -130,6 +130,94 @@ lessons = txt((await get('/lessons')).html);
 check('progress is counted', lessons.includes('1 of 10 completed'));
 check('a completed lesson is no longer suggested', !lessons.slice(lessons.indexOf('Suggested for your situation'), lessons.indexOf('All lessons')).includes('How interest works'));
 check('dashboard shows lesson progress', txt((await get('/dashboard')).html).includes('1 of 10 completed'));
+
+// Connect an AI app, the way an MCP client does it: discover, register, ask the user, exchange, call.
+const MCP = process.env.MCP_URL ?? 'http://localhost:3001/mcp';
+const { createHash, randomBytes } = await import('node:crypto');
+const rpc = (token, method, params) => fetch(MCP, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token && { authorization: `Bearer ${token}` }) },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+});
+const callTool = async (token, name, args = {}) => {
+  const res = await rpc(token, 'tools/call', { name, arguments: args });
+  // Older-protocol requests are answered as a one-event stream; newer ones as plain JSON.
+  const text = await res.text();
+  const json = res.status === 200 ? JSON.parse(text.startsWith('{') ? text : /^data: (.*)$/m.exec(text)[1]) : null;
+  return { status: res.status, challenge: res.headers.get('www-authenticate'), body: json?.result ?? null };
+};
+
+const unauth = await rpc(null, 'tools/list');
+const metadataUrl = /resource_metadata="([^"]+)"/.exec(unauth.headers.get('www-authenticate') ?? '')?.[1];
+check('MCP server answers 401 and says where its metadata is', unauth.status === 401 && !!metadataUrl);
+const resourceMeta = await (await fetch(metadataUrl)).json();
+check('metadata names this site as the authorisation server', resourceMeta.resource === MCP && resourceMeta.authorization_servers[0] === new URL(BASE).origin, JSON.stringify(resourceMeta));
+const asMeta = await (await fetch(`${resourceMeta.authorization_servers[0]}/.well-known/oauth-authorization-server`)).json();
+check('authorisation server metadata is served through the web app', asMeta.issuer === new URL(BASE).origin && asMeta.code_challenge_methods_supported?.includes('S256') && asMeta.client_id_metadata_document_supported === true, JSON.stringify(asMeta).slice(0, 300));
+
+const redirectUri = 'http://127.0.0.1:9999/callback';
+const registered = await (await fetch(asMeta.registration_endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Smoke <b>Agent</b>', redirect_uris: [redirectUri], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] }) })).json();
+check('the app registers itself', !!registered.client_id, JSON.stringify(registered));
+
+async function authorise(scope) {
+  const verifier = randomBytes(32).toString('base64url');
+  const query = new URLSearchParams({ client_id: registered.client_id, response_type: 'code', redirect_uri: redirectUri, scope, state: 'xyz', resource: MCP, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
+  return { verifier, page: await get(`${asMeta.authorization_endpoint}?${query}`) };
+}
+async function finish(returnTo, verifier) {
+  const back = await fetch(returnTo, { headers: { cookie: cookieHeader() }, redirect: 'manual' });
+  store(back);
+  const callback = new URL(back.headers.get('location'));
+  if (!callback.searchParams.get('code')) return { callback };
+  const tokens = await (await fetch(asMeta.token_endpoint, { method: 'POST', body: new URLSearchParams({ grant_type: 'authorization_code', code: callback.searchParams.get('code'), redirect_uri: redirectUri, code_verifier: verifier, client_id: registered.client_id, resource: MCP }) })).json();
+  return { callback, tokens };
+}
+
+let consent = await authorise('finance:read finance:write');
+const consentText = txt(consent.page.html);
+check('authorising lands on the consent page', consent.page.url.startsWith('/connect/') && consentText.includes('wants to connect to your FinPlan account'), consent.page.url);
+check('consent page names the app as plain text', consent.page.html.includes('Smoke &lt;b&gt;Agent&lt;/b&gt;') && !consent.page.html.includes('<b>Agent</b>'));
+check('consent page shows where the user will be sent and both permissions', consentText.includes('127.0.0.1:9999') && consentText.includes('See your financial information') && consentText.includes('Make changes for you'));
+const connectPath = consent.page.url;
+check('nothing ticked is rejected', (await submit(connectPath, has('decision'), { decision: 'allow', scope: [] })).includes('error='));
+check('allowing changes needs the password', (await submit(connectPath, has('decision'), { decision: 'allow', scope: ['finance:read', 'finance:write'], password: 'not my password' })).includes('error='));
+
+// Read access only.
+let done = await finish(await submit(connectPath, has('decision'), { decision: 'allow', scope: 'finance:read' }), consent.verifier);
+check('the app is sent back with a code and our identity', done.callback.searchParams.get('iss') === new URL(BASE).origin && done.callback.searchParams.get('state') === 'xyz');
+check('tokens are issued for read access only', done.tokens?.scope === 'finance:read' && done.tokens?.token_type === 'Bearer' && !!done.tokens?.refresh_token, JSON.stringify(done.tokens));
+const readToken = done.tokens.access_token;
+const profile = await callTool(readToken, 'get_profile', { sections: ['summary', 'debts'] });
+check('agent reads the profile entered by hand', profile.body?.structuredContent?.summary?.monthly_income_minor === 12_000_000 && profile.body.structuredContent.debts[0].user_text.label === 'Mobile loan', JSON.stringify(profile.body).slice(0, 300));
+const denied = await callTool(readToken, 'create_goal', { kind: 'other', title: 'x', target_amount_minor: 1 });
+check('read-only agent cannot write (403, told which scope)', denied.status === 403 && denied.challenge.includes('finance:write'));
+
+// Connect again, this time allowing changes with the right password. The earlier connection is replaced.
+consent = await authorise('finance:read finance:write');
+done = await finish(await submit(consent.page.url, has('decision'), { decision: 'allow', scope: ['finance:read', 'finance:write'], password }), consent.verifier);
+check('tokens are issued for read and write', done.tokens?.scope === 'finance:read finance:write', JSON.stringify(done.tokens));
+check('the replaced connection stops working', (await callTool(readToken, 'get_profile')).status === 401);
+const agentToken = done.tokens.access_token;
+// For follow-up checks with other tools (for example MCP Inspector): keep the dev token in a file, never in output.
+if (process.env.TOKEN_FILE) (await import('node:fs')).writeFileSync(process.env.TOKEN_FILE, agentToken, { mode: 0o600 });
+const agentPlan = await callTool(agentToken, 'save_plan_version', { summary: 'Agent plan: avalanche, 7,000 extra', budget: [{ category: 'housing', amount_minor: 4_500_000 }, { category: 'food', amount_minor: 2_000_000 }], debt_strategy: 'avalanche', extra_debt_payment_minor: 700_000 });
+check('agent saves plan version 3, computed by the server', agentPlan.body?.structuredContent?.version === 3 && agentPlan.body.structuredContent.results.monthly.debt_payments_minor === 1_000_000, JSON.stringify(agentPlan.body).slice(0, 300));
+planPage = txt((await get('/plan')).html);
+check('the user sees the agent\'s plan on the website', planPage.includes('Agent plan: avalanche, 7,000 extra') && /Version 3 · saved/.test(planPage));
+check('the user can undo it', (await submit('/plan', (f) => f.hidden.version === '1', {})).includes('Version 1 is now'));
+
+// Declining, and arriving signed out.
+consent = await authorise('finance:read');
+done = await finish(await submit(consent.page.url, has('decision'), { decision: 'deny' }), consent.verifier);
+check('declining tells the app access was denied', done.callback.searchParams.get('error') === 'access_denied');
+consent = await authorise('finance:read');
+const signedInCookies = new Map(jar);
+for (const name of [...jar.keys()]) if (name.includes('better-auth')) jar.delete(name);
+const asStranger = await get(consent.page.url);
+check('a signed-out visitor to the consent page must sign in first', asStranger.url.startsWith('/sign-in?next=%2Fconnect%2F'), asStranger.url);
+check('signing in returns to the consent page', (await submit(asStranger.url, has('email'), { email, password })).startsWith('/connect/'));
+jar.clear(); for (const [k, v] of signedInCookies) jar.set(k, v);
+check('an unknown consent link shows an expiry message', txt((await get('/connect/aaaaaaaaaaaaaaaaaaaaaaaa')).html).includes('This request has expired'));
 
 await submit('/dashboard', (f) => f.body.includes('Sign out'), {});
 check('signed out', (await get('/dashboard')).url.startsWith('/sign-in'));

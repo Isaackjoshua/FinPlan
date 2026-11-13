@@ -59,6 +59,9 @@ export const IDEMPOTENCY_NOTE = 'Pass a fresh `idempotency_key` so that retrying
 
 // --- Schema pieces -------------------------------------------------------------
 
+/** "This value or null". */
+export const orNull = <T extends z.ZodType>(schema: T) => z.union([schema, z.null()]);
+
 export const minor = z.number().int().min(0).max(1e13);
 export const signedMinor = z.number().int();
 export const bps = z.number().int().min(0).max(100_000);
@@ -82,7 +85,7 @@ export const budgetResult = z.strictObject({
 });
 
 const payoffDetail = {
-  debts: z.array(z.strictObject({ id: z.string(), paid_off_in_month: z.number().int(), paid_off_month: z.string().nullable(), interest_minor: minor })),
+  debts: z.array(z.strictObject({ id: z.string(), paid_off_in_month: z.number().int(), paid_off_month: orNull(z.string()), interest_minor: minor })),
   schedule: z.array(z.strictObject({ month: z.number().int(), date: z.string(), payment_minor: minor, interest_minor: minor, remaining_minor: minor })),
 };
 const payoffFeasible = {
@@ -90,7 +93,7 @@ const payoffFeasible = {
   feasible: z.literal(true),
   priority_order: z.array(z.string()),
   months_to_debt_free: z.number().int(),
-  debt_free_month: z.string().nullable(),
+  debt_free_month: orNull(z.string()),
   total_interest_minor: minor,
   total_paid_minor: minor,
   schedule_truncated: z.boolean(),
@@ -109,9 +112,9 @@ export const payoffDifference = z.strictObject({ interest_saved_by_avalanche_min
 export const emergencyFundResult = z.strictObject({
   target_minor: minor,
   gap_minor: minor,
-  months_covered: z.number().nullable(),
-  months_to_target: z.number().int().nullable(),
-  target_reached_month: z.string().nullable(),
+  months_covered: orNull(z.number()),
+  months_to_target: orNull(z.number().int()),
+  target_reached_month: orNull(z.string()),
 });
 
 export const variance = z.strictObject({ period_days: z.number().int(), spending: z.array(line.extend({ category: z.string() })), income: line, debt_payments: line });
@@ -137,7 +140,7 @@ export const planResults = z.strictObject({
   budget: budgetResult.optional(),
   debt: z.strictObject({ snowball: payoffOutline, avalanche: payoffOutline, difference: payoffDifference.nullable() }).nullable(),
   emergency_fund: emergencyFundResult,
-  goals: z.array(z.strictObject({ goal_id: z.string(), months_to_target: z.number().int().nullable(), target_reached_month: z.string().nullable() })),
+  goals: z.array(z.strictObject({ goal_id: z.string(), months_to_target: orNull(z.number().int()), target_reached_month: orNull(z.string()) })),
   warnings: z.array(warning),
 });
 export const plan = z.strictObject({
@@ -178,4 +181,37 @@ export function planOut(version: PlanVersion, detail: 'summary' | 'full'): z.inf
     inputs: toSnake(version.inputs),
     results: resultsOut(version.results, detail),
   };
+}
+
+// --- Schemas as other programs read them ----------------------------------------
+
+type Json = Record<string, unknown>;
+
+/** Rewrites `"type": ["string", "null"]` as two alternatives, each with one type. */
+function singleTypes(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(singleTypes);
+  if (!node || typeof node !== 'object') return node;
+  const { type, description, ...rest } = Object.fromEntries(Object.entries(node).map(([k, v]) => [k, singleTypes(v)])) as Json;
+  if (!Array.isArray(type)) return { ...(type !== undefined && { type }), ...(description !== undefined && { description }), ...rest };
+  return {
+    anyOf: type.map((one) => (one === 'null' ? { type: 'null' } : { type: one, ...rest })),
+    ...(description !== undefined && { description }),
+  };
+}
+
+/**
+ * Wraps a schema so that the JSON Schema advertised to AI apps avoids list-of-types
+ * fields, which some apps' schema dialects reject. Validation is unchanged.
+ */
+export function portable<T extends z.ZodType>(schema: T): T {
+  const standard = schema['~standard'] as unknown as { jsonSchema: { input: (o: unknown) => Json; output: (o: unknown) => Json } };
+  return {
+    '~standard': {
+      ...standard,
+      jsonSchema: {
+        input: (options: unknown) => singleTypes(standard.jsonSchema.input(options)) as Json,
+        output: (options: unknown) => singleTypes(standard.jsonSchema.output(options)) as Json,
+      },
+    },
+  } as unknown as T;
 }

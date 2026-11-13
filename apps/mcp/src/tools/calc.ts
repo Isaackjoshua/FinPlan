@@ -1,6 +1,6 @@
 import { calcBudget, calcDebtPayoff, calcEmergencyFund, calcSavingsProjection, compareDebtStrategies } from '@fin/calc';
 import { z } from 'zod';
-import { ASSUMPTIONS, bps, budgetResult, emergencyFundResult, isoDate, minor, MINOR_NOTE, payoffDifference, payoffResult, POSITIONING, toCamel, toSnake } from '../wire';
+import { ASSUMPTIONS, bps, budgetResult, emergencyFundResult, isoDate, minor, MINOR_NOTE, orNull, payoffDifference, payoffResult, POSITIONING, toCamel, toSnake } from '../wire';
 import { tool } from './define';
 
 // These tools take explicit numbers, read nothing about the user and store nothing.
@@ -88,8 +88,8 @@ const calcSavingsProjectionTool = tool({
     final_balance_minor: minor,
     total_contributed_minor: minor,
     total_growth_minor: minor,
-    months_to_target: z.number().int().nullable(),
-    target_reached_month: z.string().nullable(),
+    months_to_target: orNull(z.number().int()),
+    target_reached_month: orNull(z.string()),
     series: z.array(z.strictObject({ month: z.number().int(), date: z.string(), balance_minor: minor, contributed_minor: minor, growth_minor: minor })),
   }),
   async run({ start_date, ...rest }) {
