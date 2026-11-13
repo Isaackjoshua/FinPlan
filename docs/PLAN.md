@@ -210,8 +210,7 @@ Lesson content is ours, not user data, so it is not encrypted.
 - **A new connection replaces an earlier one** between the same user and app.
 - **Granting write access asks for the password again** on the consent screen. Write is unticked
   by default.
-- Not yet done: the hand test with Claude and ChatGPT (needs a public address). The pre-commit
-  secret scanner listed in section 6 is also still to add.
+- Not yet done: the hand test with Claude and ChatGPT (needs a public address).
 
 - **Streamable HTTP**, one endpoint: `POST https://mcp.<domain>/mcp`. GET and DELETE return 405.
 - **Stateless**, per `2026-07-28`. No `Mcp-Session-Id`. Each request is authenticated and

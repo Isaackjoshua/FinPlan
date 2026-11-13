@@ -18,7 +18,8 @@
     "typecheck": "pnpm -r typecheck",
     "smoke": "node scripts/smoke.mjs",
     "dev:auth": "pnpm --filter @fin/auth dev",
-    "dev:mcp": "pnpm --filter @fin/mcp dev"
+    "dev:mcp": "pnpm --filter @fin/mcp dev",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
