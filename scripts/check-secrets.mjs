@@ -20,7 +20,7 @@ for (const file of git('diff', '--cached', '--name-only', '--diff-filter=ACM').s
   if (file === 'pnpm-lock.yaml') continue;
   const added = git('diff', '--cached', '-U0', '--', file).split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++'));
   added.forEach((line, index) => {
-    for (const [name, pattern] of RULES) if (pattern.test(line)) problems.push(`${file}: added line ${index + 1} looks like a ${name}`);
+    for (const [name, pattern] of RULES) if (pattern.test(line)) problems.push(`${file}: added line ${index + 1} may contain: ${name}`);
   });
 }
 
