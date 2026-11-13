@@ -1,7 +1,8 @@
 # Production stack for a single server. Run from the repo root:
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
-# Only Caddy is reachable from outside (ports 80 and 443). Postgres and the app
-# are on a private network.
+# Only Caddy is reachable from outside (ports 80 and 443). Postgres and the apps
+# are on a private network. Caddy serves the website at DOMAIN and the MCP
+# endpoint for AI apps at mcp.DOMAIN.
 name: finplan
 
 services:
@@ -38,6 +39,40 @@ services:
       BETTER_AUTH_URL: https://${DOMAIN:?set DOMAIN in deploy/.env}
       SMTP_URL: ${SMTP_URL:?set SMTP_URL in deploy/.env}
       EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM in deploy/.env}
+      AUTH_INTERNAL_URL: http://auth:3002
+      AUTH_INTERNAL_SECRET: ${AUTH_INTERNAL_SECRET:?set AUTH_INTERNAL_SECRET in deploy/.env}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # OAuth server for AI app connections. Reached only through the web app.
+  auth:
+    build: { context: .., target: services }
+    working_dir: /repo/apps/auth
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://finplan:${POSTGRES_PASSWORD}@postgres:5432/finplan
+      BETTER_AUTH_URL: https://${DOMAIN}
+      MCP_URL: https://mcp.${DOMAIN}/mcp
+      AUTH_INTERNAL_SECRET: ${AUTH_INTERNAL_SECRET}
+      AUTH_HOST: 0.0.0.0
+      AUTH_PORT: 3002
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # The endpoint AI apps connect to.
+  mcp:
+    build: { context: .., target: services }
+    working_dir: /repo/apps/mcp
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://finplan:${POSTGRES_PASSWORD}@postgres:5432/finplan
+      DATA_MASTER_KEY: ${DATA_MASTER_KEY}
+      BETTER_AUTH_URL: https://${DOMAIN}
+      MCP_URL: https://mcp.${DOMAIN}/mcp
+      # Hostnames of web pages allowed to call the endpoint from a browser. Empty: none.
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 3001
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -54,6 +89,7 @@ services:
       - caddy_data:/data
     depends_on:
       - web
+      - mcp
 
 volumes:
   pgdata:

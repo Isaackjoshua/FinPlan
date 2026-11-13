@@ -12,7 +12,7 @@ The design, data model and milestones are in [docs/PLAN.md](docs/PLAN.md).
 | 1. Core platform (accounts, profile, goals, versioned plans, check-ins, dashboard) | Done |
 | 2. Calculation engine (budget, debt payoff, emergency fund, savings projection) | Done |
 | 3. Literacy module (lessons, quizzes, progress, suggestions) | Done |
-| 4. MCP server and OAuth | Not started |
+| 4. MCP server and OAuth (19 tools, read and write scopes, consent screen, rate limits, activity log) | Built and tested with the official MCP client and MCP Inspector. Still to do: connect Claude and ChatGPT by hand, which needs a public address |
 | 5. Agent management page | Not started |
 
 ## Run it locally
@@ -29,6 +29,14 @@ pnpm db:migrate
 pnpm dev          # http://localhost:3000
 ```
 
+To connect an AI app as well, add `AUTH_INTERNAL_SECRET` to `.env` and run two more processes,
+each in its own terminal:
+
+```sh
+pnpm dev:auth     # OAuth server, on 127.0.0.1:3002 (reached through the web app at /oauth)
+pnpm dev:mcp      # MCP endpoint, http://localhost:3001/mcp
+```
+
 Sign-up sends a confirmation email. In development it lands in Mailpit, not a real inbox.
 
 ## Tests
@@ -37,9 +45,12 @@ Sign-up sends a confirmation email. In development it lands in Mailpit, not a re
 pnpm test         # unit, property and database tests (needs `pnpm db:up`)
 pnpm test:coverage  # same, and fails unless the calculation engine is 100% covered
 pnpm typecheck
-pnpm build && pnpm --filter @fin/web start   # then, in another terminal:
-pnpm smoke        # walks through the real pages end to end
+pnpm build && pnpm --filter @fin/web start   # with the auth and MCP servers also running, then:
+pnpm smoke        # walks through the real pages end to end, including connecting an agent
 ```
+
+To poke at the MCP server by hand, use [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+`npx @modelcontextprotocol/inspector`, then enter `http://localhost:3001/mcp`.
 
 ## Deploying
 
@@ -48,7 +59,10 @@ See [docs/DEPLOY.md](docs/DEPLOY.md) for running it on a single server with HTTP
 ## Layout
 
 ```
-apps/web        Next.js app: sign-up, dashboard, profile, goals, plan, check-ins, lessons
+apps/web        Next.js app: sign-up, dashboard, profile, goals, plan, check-ins, lessons,
+                and the consent page shown when an AI app asks to connect
+apps/auth       OAuth 2.1 authorisation server (oidc-provider). Issues tokens; holds no financial data
+apps/mcp        MCP server: the tools AI apps call. Checks the token, scope and rate limit on every call
 packages/calc   Calculation engine: pure functions, no I/O, no dependencies
 packages/core   Domain logic. The only code that reads or writes financial data
                 Lesson content is in packages/core/src/content

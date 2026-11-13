@@ -189,6 +189,30 @@ Lesson content is ours, not user data, so it is not encrypted.
 
 ### Transport and protocol
 
+*As built in milestone 4.* Differences from the plan below, each small:
+
+- **The OAuth server is its own process** (`apps/auth`), not mounted inside the Next.js app. It is
+  still served from the website's address (the web app passes `/oauth/*` and the discovery
+  document through to it) and is not reachable directly. `oidc-provider` 9.13 supports CIMD
+  (draft 02), DCR, RFC 9207 and RFC 8707 natively, so no token logic was hand-written.
+- **OAuth storage is one table**, `oauth_records`, in place of `oauth_clients`, `oauth_codes` and
+  `oauth_tokens`. Tokens and codes are keyed by a SHA-256 hash. `rate_limit_buckets` became
+  `rate_limits` (fixed windows).
+- **Money is a plain integer** in a field ending `_minor`, with the user's currency given once per
+  response, not a `{ amount_minor, currency }` object on every figure. Fewer tokens, same meaning.
+- **Lessons are identified by `slug`**, so `get_lesson` and `assign_lessons` take slugs.
+- **`update_profile` takes one `items` list** covering income, expenses, debts and savings, each
+  entry tagged with its `kind`, in place of four separate lists.
+- **`get_progress` reports debt payments logged in check-ins** in place of "debt paid down since
+  the first plan", which the stored data cannot answer exactly.
+- **Requests in the older protocol revision are answered as a one-event stream**, which is how the
+  SDK serves them; `2026-07-28` requests get plain JSON as planned.
+- **A new connection replaces an earlier one** between the same user and app.
+- **Granting write access asks for the password again** on the consent screen. Write is unticked
+  by default.
+- Not yet done: the hand test with Claude and ChatGPT (needs a public address). The pre-commit
+  secret scanner listed in section 6 is also still to add.
+
 - **Streamable HTTP**, one endpoint: `POST https://mcp.<domain>/mcp`. GET and DELETE return 405.
 - **Stateless**, per `2026-07-28`. No `Mcp-Session-Id`. Each request is authenticated and
   authorised on its own. This also means the server scales horizontally with no sticky sessions.
