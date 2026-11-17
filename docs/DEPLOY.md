@@ -25,9 +25,13 @@ Oracle blocks ports in two places, and both must allow 80 and 443:
 2. **On the server itself:** Oracle's Ubuntu images ship with iptables rules that reject everything
    but SSH.
 
+   The new rules must come before the final `REJECT` rule, or they never take effect. Find its
+   number first (it was 5 on Ubuntu 24.04), then insert at that position:
+
    ```sh
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+   sudo iptables -L INPUT -n --line-numbers    # note the number of the REJECT line
+   sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+   sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT
    sudo netfilter-persistent save
    ```
 
