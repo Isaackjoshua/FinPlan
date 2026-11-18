@@ -1,4 +1,5 @@
 import { ConfirmWithGoogle } from '@/components/google-button';
+import { ThemePicker } from '@/components/theme-picker';
 import { Field, Flash, PageHeader } from '@/components/ui';
 import { getAuth } from '@/lib/auth';
 import { back } from '@/lib/forms';
@@ -36,6 +37,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader title="Your account">Signed in as {user.email}.</PageHeader>
       <Flash searchParams={searchParams} />
+
+      <section className="card mb-6 max-w-2xl">
+        <h2 className="font-semibold">Appearance</h2>
+        <p className="mb-3 mt-1 text-sm text-muted">Night mode is easier on the eyes in the dark. System follows your device&apos;s setting. Saved on this device only.</p>
+        <ThemePicker />
+      </section>
 
       <section className="card mb-6 max-w-2xl">
         <h2 className="font-semibold">Download your data</h2>

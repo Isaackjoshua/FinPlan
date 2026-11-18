@@ -57,14 +57,14 @@ export function Nav({ name }: { name: string }) {
 
   return (
     <>
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium">
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-line bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-line bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
           <Link href="/dashboard" className="flex items-center gap-2 font-semibold tracking-tight text-brand">
-            <span aria-hidden="true" className="grid size-7 place-items-center rounded-lg bg-brand text-white">
+            <span aria-hidden="true" className="grid size-7 place-items-center rounded-lg bg-brand text-on-brand">
               <svg viewBox="0 0 24 24" className="size-4" fill="currentColor"><rect x="5" y="13" width="3.5" height="6" rx="1" /><rect x="10.25" y="9.5" width="3.5" height="9.5" rx="1" /><rect x="15.5" y="6" width="3.5" height="13" rx="1" /></svg>
             </span>
             FinPlan
@@ -92,7 +92,7 @@ export function Nav({ name }: { name: string }) {
       </header>
 
       {/* Phones: a tab bar within reach of the thumb. */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <ul className="mx-auto grid max-w-md grid-cols-5">
           {PRIMARY.map(({ href, label, icon }) => {
             const active = isActive(pathname, href);
@@ -115,7 +115,7 @@ export function Nav({ name }: { name: string }) {
                 {ICONS.more}
                 More
               </summary>
-              <div className="absolute inset-x-3 bottom-[calc(100%+0.5rem)] rounded-2xl border border-line bg-white p-2 shadow-[0_12px_32px_-12px_rgb(23_32_28/0.35)]">
+              <div className="absolute inset-x-3 bottom-[calc(100%+0.5rem)] rounded-2xl border border-line bg-surface p-2 shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)]">
                 <p className="px-3 pb-1 pt-2 text-xs text-muted">Signed in as {name}</p>
                 <ul>
                   {SECONDARY.map(({ href, label }) => (

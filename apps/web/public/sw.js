@@ -6,7 +6,7 @@
 // data, because they hold someone's finances and a phone or laptop may be shared.
 
 // Change this when offline.html changes, so installed apps fetch the new copy.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `finplan-offline-${VERSION}`;
 const OFFLINE_URL = '/offline.html';
 

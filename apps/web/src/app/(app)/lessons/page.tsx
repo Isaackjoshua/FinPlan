@@ -59,7 +59,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Prom
     if (l) query.set('level', String(l));
     return `/lessons${query.size ? `?${query}` : ''}#browse`;
   };
-  const chip = (active: boolean) => `rounded-full border px-3 py-1 text-sm ${active ? 'border-brand bg-brand text-white' : 'border-line bg-white text-ink hover:bg-paper'}`;
+  const chip = (active: boolean) => `rounded-full border px-3 py-1 text-sm ${active ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface text-ink hover:bg-paper'}`;
 
   return (
     <>

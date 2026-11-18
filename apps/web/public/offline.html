@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f6b4f" />
     <title>Offline · FinPlan</title>
@@ -34,6 +35,12 @@
         font-size: 0.875rem;
         font-weight: 600;
         text-decoration: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0e1311; color: #e4ebe7; }
+        p.brand { color: #4cb98f; }
+        p.lead { color: #97a49e; }
+        a { background: #4cb98f; color: #07130e; }
       }
     </style>
   </head>
