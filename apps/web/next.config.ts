@@ -23,6 +23,17 @@ const config: NextConfig = {
           { key: 'Referrer-Policy', value: 'same-origin' },
         ],
       },
+      {
+        // The service worker sits in front of every request, so a stale or tampered copy matters.
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          // Always fetch the latest version, so a fix reaches installed apps at once.
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          // It may only load code from this site.
+          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
     ];
   },
 };
