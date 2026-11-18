@@ -42,6 +42,9 @@ services:
       AUTH_INTERNAL_URL: http://auth:3002
       MCP_URL: https://mcp.${DOMAIN}/mcp
       AUTH_INTERNAL_SECRET: ${AUTH_INTERNAL_SECRET:?set AUTH_INTERNAL_SECRET in deploy/.env}
+      # Optional: both empty means no "Continue with Google" button.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       migrate: { condition: service_completed_successfully }
 

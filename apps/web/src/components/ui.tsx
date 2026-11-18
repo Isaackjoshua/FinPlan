@@ -2,9 +2,19 @@ import type { ReactNode } from 'react';
 
 type Search = Promise<{ error?: string; notice?: string }>;
 
+// A failed Google sign-in comes back with a code such as "access_denied" rather than a sentence.
+const SIGN_IN_CODES: Record<string, string> = {
+  access_denied: 'Google sign-in was cancelled.',
+  account_not_linked: 'That email address already has a FinPlan account that has not been confirmed. Confirm it from the email we sent, or sign in with your password.',
+  unable_to_link_account: 'That email address already has a FinPlan account that has not been confirmed. Confirm it from the email we sent, or sign in with your password.',
+};
+const readable = (message: string) =>
+  /^[A-Za-z_]+$/.test(message) ? (SIGN_IN_CODES[message.toLowerCase()] ?? 'Signing in with Google did not finish. Try again.') : message;
+
 /** Shows the message a form action left in the URL. */
 export async function Flash({ searchParams }: { searchParams: Search }) {
-  const { error, notice } = await searchParams;
+  const { error: raw, notice } = await searchParams;
+  const error = raw && readable(raw);
   if (error) {
     return (
       <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">

@@ -2,9 +2,9 @@
 
 import { finishConsent } from '@/lib/authServer';
 import { back } from '@/lib/forms';
-import { passwordMatches } from '@/lib/password';
+import { hasPassword, passwordMatches } from '@/lib/password';
 import { getCtx } from '@/lib/server';
-import { getSessionUser } from '@/lib/session';
+import { getSessionUser, signedInRecently } from '@/lib/session';
 import { hitRateLimit } from '@fin/core';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -26,7 +26,10 @@ export async function decide(form: FormData) {
   if (scopes.length === 0) back(page, 'error', 'Tick at least one permission, or choose Deny.');
 
   // Letting an app change your data is the more serious permission, so it needs your password again.
-  if (scopes.includes('finance:write')) {
+  if (scopes.includes('finance:write') && !(await hasPassword(user.id))) {
+    // No password to check: a sign-in with Google in the last few minutes confirms it instead.
+    if (!(await signedInRecently())) back(page, 'error', 'To allow changes, confirm with Google first, below.');
+  } else if (scopes.includes('finance:write')) {
     const attempts = await hitRateLimit(getCtx(), `consent-password:${user.id}`, 5, 15 * 60);
     if (!attempts.allowed) back(page, 'error', 'Too many password attempts. Wait a few minutes and try again.');
     if (!(await passwordMatches(user.id, String(form.get('password') ?? '')))) {

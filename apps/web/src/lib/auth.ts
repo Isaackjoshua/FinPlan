@@ -7,6 +7,9 @@ import { nextCookies } from 'better-auth/next-js';
 import { sendEmail } from './mailer';
 import { getCtx } from './server';
 
+/** Google sign-in is offered only when its keys are configured (see .env.example). */
+export const googleEnabled = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
 function build() {
   return betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -43,6 +46,20 @@ function build() {
         });
       },
     },
+    socialProviders: googleEnabled()
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            // Always show Google's account chooser, so a shared computer cannot sign in the wrong person silently.
+            prompt: 'select_account',
+          },
+        }
+      : {},
+    // A Google sign-in joins an existing FinPlan account with the same address, but only when Google
+    // says the address is verified and the FinPlan account had confirmed it too (Better Auth's
+    // defaults). Otherwise someone could pre-register a victim's address and inherit their Google login.
+    account: { accountLinking: { enabled: true } },
     rateLimit: { enabled: true, window: 60, max: 30 },
     // Must be last: lets server actions set the session cookie.
     plugins: [nextCookies()],

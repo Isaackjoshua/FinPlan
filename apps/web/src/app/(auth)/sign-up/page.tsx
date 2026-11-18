@@ -1,3 +1,4 @@
+import { GoogleSignIn } from '@/components/google-button';
 import { Field, Flash } from '@/components/ui';
 import Link from 'next/link';
 import { signUp } from '../actions';
@@ -9,6 +10,7 @@ export default function SignUp({ searchParams }: { searchParams: Promise<{ error
     <>
       <h1 className="mb-4 text-2xl font-semibold">Create an account</h1>
       <Flash searchParams={searchParams} />
+      <GoogleSignIn label="Sign up with Google" />
       <form action={signUp} className="space-y-4">
         <Field label="Name"><input name="name" required maxLength={80} autoComplete="name" className="input" /></Field>
         <Field label="Email"><input name="email" type="email" required autoComplete="email" className="input" /></Field>
@@ -17,6 +19,10 @@ export default function SignUp({ searchParams }: { searchParams: Promise<{ error
         </Field>
         <button className="btn w-full">Create account</button>
       </form>
+      <p className="mt-4 text-xs text-muted">
+        By creating an account you agree to the <Link href="/terms" className="link">terms of service</Link> and{' '}
+        <Link href="/privacy" className="link">privacy policy</Link>.
+      </p>
       <p className="mt-4 text-sm text-muted">Already have an account? <Link href="/sign-in" className="link">Sign in</Link></p>
     </>
   );

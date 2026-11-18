@@ -1,6 +1,6 @@
 'use server';
 
-import { getAuth } from '@/lib/auth';
+import { getAuth, googleEnabled } from '@/lib/auth';
 import { back, str } from '@/lib/forms';
 import { APIError } from 'better-auth/api';
 import { headers } from 'next/headers';
@@ -39,6 +39,35 @@ export async function signIn(form: FormData) {
     throw error;
   }
   redirect(next ?? '/dashboard');
+}
+
+/** Sends the browser to Google. Afterwards it comes back to `callbackURL`, signed in. */
+async function goToGoogle(callbackURL: string, errorPage: string): Promise<never> {
+  if (!googleEnabled()) back(errorPage, 'error', 'Signing in with Google is not available.');
+  const { url } = await getAuth().api.signInSocial({
+    body: { provider: 'google', callbackURL, errorCallbackURL: errorPage },
+    headers: await headers(),
+  });
+  if (!url) back(errorPage, 'error', 'Google sign-in could not be started. Try again.');
+  redirect(url);
+}
+
+/** "Continue with Google" on the sign-in and sign-up pages. New accounts are created on the way. */
+export async function signInWithGoogle(form: FormData) {
+  const next = safeNext(str(form, 'next'));
+  await goToGoogle(next ?? '/dashboard', next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in');
+}
+
+// Pages that may ask someone to confirm it is them: the consent page and the account page.
+const safeReturn = (value: string) => safeNext(value) ?? (value === '/account' ? value : null);
+
+/**
+ * "Confirm with Google" for people without a FinPlan password. Signing in again starts a
+ * new session, and a session only minutes old counts as confirmation (see signedInRecently).
+ */
+export async function confirmWithGoogle(form: FormData) {
+  const returnTo = safeReturn(str(form, 'returnTo')) ?? '/dashboard';
+  await goToGoogle(returnTo, returnTo);
 }
 
 export async function signOut() {

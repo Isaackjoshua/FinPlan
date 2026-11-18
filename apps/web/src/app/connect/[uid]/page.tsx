@@ -1,6 +1,8 @@
+import { ConfirmWithGoogle } from '@/components/google-button';
 import { Field, Flash } from '@/components/ui';
+import { hasPassword } from '@/lib/password';
 import { getConsentRequest } from '@/lib/authServer';
-import { getSessionUser } from '@/lib/session';
+import { getSessionUser, signedInRecently } from '@/lib/session';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -53,6 +55,10 @@ export default async function Connect({ params, searchParams }: { params: Promis
   }
 
   const name = request.clientName ?? 'An app';
+  const canWrite = request.scopes.includes('finance:write');
+  // People who signed up with Google have no password: they confirm by signing in with Google again.
+  const usesPassword = await hasPassword(user.id);
+  const confirmed = !usesPassword && (await signedInRecently());
   return (
     <Shell>
       <h1 className="mb-2 text-2xl font-semibold">Connect an AI app</h1>
@@ -82,17 +88,24 @@ export default async function Connect({ params, searchParams }: { params: Promis
             </label>
           ))}
         </fieldset>
-        {request.scopes.includes('finance:write') && (
+        {canWrite && usesPassword && (
           <Field label="Your FinPlan password" hint="Only needed if you allow it to make changes.">
             <input name="password" type="password" autoComplete="current-password" className="input" />
           </Field>
         )}
+        {canWrite && confirmed && <p className="text-sm text-brand-dark">You confirmed with Google just now, so you can allow changes.</p>}
         <p className="text-xs text-muted">FinPlan supports financial education and planning. Connected apps get no tools for trading or for recommending specific investments. You can disconnect an app at any time.</p>
         <div className="flex gap-3">
           <button name="decision" value="allow" className="btn flex-1">Allow</button>
           <button name="decision" value="deny" formNoValidate className="btn-quiet flex-1">Deny</button>
         </div>
       </form>
+      {canWrite && !usesPassword && !confirmed && (
+        <div className="mt-6 border-t border-line pt-5">
+          <p className="mb-3 text-sm text-muted">To let it make changes, first confirm it's you. You'll come straight back here.</p>
+          <ConfirmWithGoogle returnTo={`/connect/${uid}`} />
+        </div>
+      )}
     </Shell>
   );
 }

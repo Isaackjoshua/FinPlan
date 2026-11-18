@@ -6,13 +6,26 @@ import { cache } from 'react';
 import { getAuth } from './auth';
 import { getCtx } from './server';
 
-export const getSessionUser = cache(async () => {
+const getSession = cache(async () => {
   // Read the request first: that tells Next this page is per-request, so it is never
   // pre-rendered at build time (when there is no database to talk to).
   const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
-  return session?.user ?? null;
+  return getAuth().api.getSession({ headers: requestHeaders });
 });
+
+export const getSessionUser = cache(async () => (await getSession())?.user ?? null);
+
+/** How recent a sign-in must be to stand in for typing a password again. */
+const CONFIRM_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * True when the current session began in the last few minutes. For people without a
+ * password, signing in again with Google is how they confirm a serious action.
+ */
+export async function signedInRecently(): Promise<boolean> {
+  const session = await getSession();
+  return !!session && Date.now() - new Date(session.session.createdAt).getTime() < CONFIRM_WINDOW_MS;
+}
 
 /** For pages and actions that need a signed-in user. */
 export async function requireUser() {

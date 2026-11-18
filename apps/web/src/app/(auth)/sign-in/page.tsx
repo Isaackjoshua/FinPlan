@@ -1,3 +1,4 @@
+import { GoogleSignIn } from '@/components/google-button';
 import { Field, Flash } from '@/components/ui';
 import Link from 'next/link';
 import { signIn } from '../actions';
@@ -11,6 +12,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
       <h1 className="mb-4 text-2xl font-semibold">Sign in</h1>
       <Flash searchParams={searchParams} />
       {next && <p className="mb-4 text-sm text-muted">Sign in to continue connecting your AI app.</p>}
+      <GoogleSignIn next={next} />
       <form action={signIn} className="space-y-4">
         {next && <input type="hidden" name="next" value={next} />}
         <Field label="Email"><input name="email" type="email" required autoComplete="email" className="input" /></Field>
