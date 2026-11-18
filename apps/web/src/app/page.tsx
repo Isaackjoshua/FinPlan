@@ -1,3 +1,4 @@
+import { SiteFooter } from '@/components/site-footer';
 import { Flash } from '@/components/ui';
 import { getSessionUser } from '@/lib/session';
 import Link from 'next/link';
@@ -22,6 +23,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         FinPlan supports financial education and planning. It does not give investment advice or recommend
         specific investments.
       </p>
+      <SiteFooter className="mt-4" />
     </main>
   );
 }
