@@ -146,7 +146,7 @@ export default async function AgentsPage({ searchParams }: { searchParams: Promi
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-muted">
+              <thead className="text-xs font-medium text-muted">
                 <tr><th className="py-2 pr-4">When</th><th className="py-2 pr-4">App</th><th className="py-2 pr-4">Request</th><th className="py-2 pr-4">Result</th><th className="py-2">Details</th></tr>
               </thead>
               <tbody>

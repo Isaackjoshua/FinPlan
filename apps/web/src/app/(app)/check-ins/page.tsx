@@ -1,4 +1,4 @@
-import { Empty, Field, Flash, humanise, PageHeader } from '@/components/ui';
+import { Empty, Field, Flash, formatPeriod, humanise, PageHeader } from '@/components/ui';
 import { money, optionalMoney, run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
@@ -49,7 +49,7 @@ export default async function CheckInsPage({ searchParams }: { searchParams: Pro
 
       <section className="card mb-6">
         <details open={checkIns.length === 0}>
-          <summary className="cursor-pointer text-lg font-semibold">Log a check-in</summary>
+          <summary className="disclosure text-lg font-semibold">Log a check-in</summary>
           <form action={save} className="mt-4 space-y-5">
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="From"><input name="periodStart" type="date" required defaultValue={start} className="input" /></Field>
@@ -84,7 +84,7 @@ export default async function CheckInsPage({ searchParams }: { searchParams: Pro
               const spent = c.actuals.spending.reduce((sum, row) => sum + row.amountMinor, 0);
               return (
                 <li key={c.id} className="py-3 text-sm">
-                  <p className="font-medium">{c.periodStart} to {c.periodEnd} <span className="ml-1 text-xs font-normal text-muted">logged by {c.loggedBy === 'agent' ? 'your agent' : 'you'}</span></p>
+                  <p className="font-medium">{formatPeriod(c.periodStart, c.periodEnd)} <span className="ml-1 text-xs font-normal text-muted">logged by {c.loggedBy === 'agent' ? 'your agent' : 'you'}</span></p>
                   <p className="num mt-1 text-muted">
                     Income {formatAmount(c.actuals.incomeMinor, cur)} · Spent {formatAmount(spent, cur)}
                     {budgetTotal !== undefined && budgetTotal > 0 && <> ({spent > budgetTotal ? `${formatAmount(spent - budgetTotal, cur)} over` : `${formatAmount(budgetTotal - spent, cur)} under`} current budget)</>}

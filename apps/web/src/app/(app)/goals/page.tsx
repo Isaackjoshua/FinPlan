@@ -74,7 +74,7 @@ export default async function GoalsPage({ searchParams }: { searchParams: Promis
               return (
                 <li key={goal.id} className="py-3">
                   <details>
-                    <summary className="cursor-pointer">
+                    <summary className="disclosure">
                       <span className="flex flex-wrap items-baseline justify-between gap-x-4">
                         <span className="font-medium">{goal.title} {goal.status !== 'active' && <span className="text-xs font-normal text-muted">({goal.status})</span>}</span>
                         <span className="num text-sm text-muted">{formatAmount(goal.currentAmountMinor, cur)} of {formatAmount(goal.targetAmountMinor, cur)} · {pct}%</span>

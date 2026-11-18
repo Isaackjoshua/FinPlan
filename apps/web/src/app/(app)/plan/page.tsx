@@ -123,7 +123,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
 
       <section className="card mb-6">
         <details open={!current}>
-          <summary className="cursor-pointer text-lg font-semibold">{current ? 'Create a new version' : 'Create your first plan'}</summary>
+          <summary className="disclosure text-lg font-semibold">{current ? 'Create a new version' : 'Create your first plan'}</summary>
           <form action={saveVersion} className="mt-4 space-y-5">
             {current && <input type="hidden" name="baseVersion" value={current.version} />}
             <Field label="What is this plan, in a sentence or two?">
@@ -180,11 +180,11 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             {versions.map((v) => (
               <li key={v.version} className="py-3">
                 <details>
-                  <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
+                  <summary className="disclosure gap-y-2">
                     <span>
                       <span className="font-medium">Version {v.version}</span>
                       {v.isCurrent && <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand-dark">Current</span>}
-                      <span className="ml-2 text-xs text-muted">{when(v.savedAt)} · {v.savedBy === 'agent' ? 'your agent' : 'you'}</span>
+                      <span className="mt-0.5 block text-xs text-muted sm:ml-2 sm:mt-0 sm:inline">{when(v.savedAt)} · {v.savedBy === 'agent' ? 'your agent' : 'you'}</span>
                     </span>
                     {!v.isCurrent && (
                       <form action={makeCurrent}>

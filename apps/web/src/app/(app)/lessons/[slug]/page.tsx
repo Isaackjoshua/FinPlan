@@ -59,7 +59,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
     <article className="mx-auto max-w-2xl">
       <p className="text-sm"><Link href="/lessons" className="link">← All lessons</Link></p>
       <header className="mt-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">{humanise(lesson.topic)} · {lesson.minutes} min{state?.status === 'completed' && ' · Completed'}</p>
+        <p className="text-sm text-muted">{humanise(lesson.topic)} · {lesson.minutes} min{state?.status === 'completed' && ' · Completed'}</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">{lesson.title}</h1>
         <p className="mt-2 text-muted">{lesson.summary}</p>
       </header>

@@ -1,5 +1,5 @@
 import { monthName } from '@/components/plan-results';
-import { Empty, PageHeader, Stat } from '@/components/ui';
+import { Empty, formatPeriod, PageHeader } from '@/components/ui';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
 import { formatAmount, getCurrentPlan, getLessonStates, listCheckIns, listGoals, listItems, listLessons, profileWarnings, recommendLessons, summarise } from '@fin/core';
@@ -21,6 +21,7 @@ export default async function Dashboard() {
   const s = summarise(items);
   const warnings = profileWarnings(s);
   const activeGoals = goals.filter((g) => g.status === 'active');
+  const spentShare = s.monthlyIncome > 0 ? Math.round((s.monthlyExpenses / s.monthlyIncome) * 100) : 0;
   const monthsCovered = s.monthlyEssentialExpenses > 0 ? (s.emergencyFund / s.monthlyEssentialExpenses).toFixed(1) : null;
   const lastCheckIn = checkIns[0];
   const lessons = listLessons();
@@ -41,18 +42,36 @@ export default async function Dashboard() {
           <Link href="/profile" className="btn mt-4">Fill in your profile</Link>
         </section>
       ) : (
-        <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Monthly income" value={formatAmount(s.monthlyIncome, cur)} />
-          <Stat label="Monthly expenses" value={formatAmount(s.monthlyExpenses, cur)} />
-          <Stat label={s.monthlySurplus < 0 ? 'Monthly shortfall' : 'Left over each month'} value={formatAmount(Math.abs(s.monthlySurplus), cur)} tone={s.monthlySurplus < 0 ? 'bad' : 'good'} />
-          <Stat label="Total debt" value={formatAmount(s.totalDebt, cur)} />
-          <Stat label="Total savings" value={formatAmount(s.totalSavings, cur)} />
-          <Stat label="Emergency fund" value={monthsCovered ? `${monthsCovered} months` : formatAmount(s.emergencyFund, cur)} />
+        <section aria-labelledby="month-heading" className="card mb-6 sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:gap-10">
+            <div>
+              <h2 id="month-heading" className="text-sm font-medium text-muted">{s.monthlySurplus < 0 ? 'Short each month' : 'Left over each month'}</h2>
+              <p className={`num mt-1 text-[2.5rem] font-semibold leading-none tracking-tight sm:text-5xl ${s.monthlySurplus < 0 ? 'text-danger' : 'text-brand'}`}>
+                {formatAmount(Math.abs(s.monthlySurplus), cur)}
+              </p>
+              {/* Where each month's income goes: spent, and what remains (or the gap). */}
+              <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-brand-soft" role="img" aria-label={`Expenses take ${spentShare}% of income`}>
+                <div className={`h-full ${s.monthlySurplus < 0 ? 'bg-danger' : 'bg-ink'}`} style={{ width: `${Math.min(100, spentShare)}%` }} />
+              </div>
+              <dl className="mt-3 flex flex-wrap justify-between gap-x-6 gap-y-1 text-sm">
+                <div className="flex gap-1.5"><dt className="text-muted">Income</dt><dd className="num font-medium">{formatAmount(s.monthlyIncome, cur)}</dd></div>
+                <div className="flex gap-1.5"><dt className="text-muted">Expenses</dt><dd className="num font-medium">{formatAmount(s.monthlyExpenses, cur)} <span className="font-normal text-muted">({spentShare}%)</span></dd></div>
+              </dl>
+            </div>
+            <dl className="divide-y divide-line border-t border-line text-[0.9375rem] lg:border-t-0 lg:border-l lg:pl-10">
+              <div className="flex items-baseline justify-between gap-4 py-3 lg:pt-0"><dt className="text-muted">Total debt</dt><dd className="num font-semibold">{formatAmount(s.totalDebt, cur)}</dd></div>
+              <div className="flex items-baseline justify-between gap-4 py-3"><dt className="text-muted">Total savings</dt><dd className="num font-semibold">{formatAmount(s.totalSavings, cur)}</dd></div>
+              <div className="flex items-baseline justify-between gap-4 py-3 lg:pb-0">
+                <dt className="text-muted">Emergency fund</dt>
+                <dd className="num font-semibold">{monthsCovered ? `${monthsCovered} months of essentials` : formatAmount(s.emergencyFund, cur)}</dd>
+              </div>
+            </dl>
+          </div>
         </section>
       )}
 
       {warnings.length > 0 && (
-        <section className="mb-6 rounded-xl border border-warn/30 bg-warn/5 p-5">
+        <section className="mb-6 rounded-2xl border border-warn/25 bg-warn/5 p-5 sm:p-6">
           <h2 className="font-semibold text-warn">Worth a look</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {warnings.map((w) => <li key={w.code}>{w.message}</li>)}
@@ -62,7 +81,7 @@ export default async function Dashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Your plan</h2>
             <Link href="/plan" className="link text-sm">{plan ? 'Open' : 'Create'}</Link>
           </div>
@@ -83,7 +102,7 @@ export default async function Dashboard() {
         </section>
 
         <section className="card">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Goals</h2>
             <Link href="/goals" className="link text-sm">Manage</Link>
           </div>
@@ -105,7 +124,7 @@ export default async function Dashboard() {
         </section>
 
         <section className="card lg:col-span-2">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Lessons</h2>
             <Link href="/lessons" className="link text-sm">All lessons</Link>
           </div>
@@ -117,7 +136,7 @@ export default async function Dashboard() {
             <ul className="mt-3 grid gap-2 sm:grid-cols-3">
               {nextLessons.map((lesson) => (
                 <li key={lesson.slug}>
-                  <Link href={`/lessons/${lesson.slug}`} className="block rounded-lg border border-line px-3 py-2 text-sm hover:bg-paper">
+                  <Link href={`/lessons/${lesson.slug}`} className="block h-full rounded-xl border border-line px-3.5 py-3 text-sm transition-colors hover:border-brand/40 hover:bg-paper">
                     <span className="font-medium">{lesson.title}</span>
                     <span className="block text-xs text-muted">{assignedLessons.length > 0 ? 'Assigned' : 'Suggested'} · {lesson.minutes} min</span>
                   </Link>
@@ -128,13 +147,13 @@ export default async function Dashboard() {
         </section>
 
         <section className="card lg:col-span-2">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Latest check-in</h2>
             <Link href="/check-ins" className="link text-sm">{lastCheckIn ? 'All check-ins' : 'Log one'}</Link>
           </div>
           {lastCheckIn ? (
             <p className="num text-sm text-muted">
-              {lastCheckIn.periodStart} to {lastCheckIn.periodEnd}: income {formatAmount(lastCheckIn.actuals.incomeMinor, cur)}, spent{' '}
+              {formatPeriod(lastCheckIn.periodStart, lastCheckIn.periodEnd)}: income {formatAmount(lastCheckIn.actuals.incomeMinor, cur)}, spent{' '}
               {formatAmount(lastCheckIn.actuals.spending.reduce((sum, r) => sum + r.amountMinor, 0), cur)}, saved {formatAmount(lastCheckIn.actuals.savingsAddedMinor, cur)}.
             </p>
           ) : (

@@ -166,7 +166,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                   {rows.map((item) => (
                     <li key={item.id} className="py-3">
                       <details>
-                        <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-x-4">
+                        <summary className="disclosure gap-y-0.5">
                           <span className="font-medium">{item.label}</span>
                           <span className="num text-sm text-muted">{describe(item, profile.currency)}</span>
                         </summary>

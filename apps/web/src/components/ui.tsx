@@ -24,9 +24,9 @@ export async function Flash({ searchParams }: { searchParams: Search }) {
 
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <header className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      {children && <p className="mt-1 max-w-2xl text-sm text-muted">{children}</p>}
+    <header className="mb-6 sm:mb-8">
+      <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight sm:text-3xl">{title}</h1>
+      {children && <p className="mt-1.5 max-w-2xl text-[0.9375rem] leading-relaxed text-muted">{children}</p>}
     </header>
   );
 }
@@ -41,18 +41,14 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
-export function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
-  const colour = tone === 'bad' ? 'text-danger' : tone === 'good' ? 'text-brand-dark' : 'text-ink';
-  return (
-    <div className="card">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`num mt-1 text-xl font-semibold ${colour}`}>{value}</p>
-    </div>
-  );
+/** "2026-10-01", "2026-10-31" -> "1–31 Oct 2026" */
+export function formatPeriod(start: string, end: string): string {
+  const date = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).formatRange(date(start), date(end));
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-muted">{children}</p>;
+  return <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">{children}</p>;
 }
 
 /** "housing" -> "Housing", "credit_card" -> "Credit card" */
