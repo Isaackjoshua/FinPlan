@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startAuth } from '../../auth/test/flow';
 import { createMcpApp, type Limits } from '../src';
+import { matchesContract } from './contract';
 
 /** Runs the MCP server and the OAuth server on spare ports, each knowing its real address. */
 export async function startStack(ctx: Ctx, options: { limits?: Partial<Limits>; allowedOrigins?: string[] } = {}) {
@@ -37,6 +38,8 @@ export async function startStack(ctx: Ctx, options: { limits?: Partial<Limits>; 
     async function call<T = any>(name: string, args: Record<string, unknown> = {}): Promise<T> {
       const result = await mcp.callTool({ name, arguments: args });
       if (result.isError) throw new Error((result.content as { text: string }[])[0]?.text ?? 'tool error');
+      // Apps that connected earlier still hold the tool list they were given then.
+      matchesContract(name, result.structuredContent);
       return result.structuredContent as T;
     }
     return { mcp, call, seen, last: () => seen.at(-1)!, close: () => mcp.close() };

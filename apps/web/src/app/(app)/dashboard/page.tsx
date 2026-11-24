@@ -1,13 +1,55 @@
 import { monthName } from '@/components/plan-results';
-import { Empty, formatPeriod, PageHeader } from '@/components/ui';
+import { Empty, Flash, formatPeriod, PageHeader } from '@/components/ui';
+import { run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
-import { formatAmount, getCurrentPlan, getLessonStates, listCheckIns, listGoals, listItems, listLessons, profileWarnings, recommendLessons, summarise } from '@fin/core';
+import {
+  checkProfile,
+  COMPLETENESS_CODES,
+  formatAmount,
+  getCurrentPlan,
+  getLessonStates,
+  listCheckIns,
+  listGoals,
+  listItems,
+  listLessons,
+  recommendLessons,
+  setWarningAcknowledged,
+  type CompletenessCode,
+} from '@fin/core';
 import Link from 'next/link';
 
 export const metadata = { title: 'Dashboard' };
 
-export default async function Dashboard() {
+/** What the user is saying when they settle a completeness check. */
+const ANSWERS: Record<CompletenessCode, string> = {
+  no_housing_recorded: 'I pay nothing for housing',
+  no_food_recorded: 'I pay nothing for food',
+  expenses_look_low: 'My spending is this low',
+  surplus_unreliable: 'That is all my spending',
+};
+const isCompletenessCode = (code: string): code is CompletenessCode => (COMPLETENESS_CODES as readonly string[]).includes(code);
+
+async function acknowledge(form: FormData) {
+  'use server';
+  const { userId } = await requireProfile();
+  const code = str(form, 'code');
+  await run('/dashboard', async () => {
+    if (isCompletenessCode(code)) await setWarningAcknowledged(getCtx(), userId, code, str(form, 'acknowledged') === 'yes');
+  }, 'Saved.');
+}
+
+function AnswerForm({ code, acknowledged, children }: { code: CompletenessCode; acknowledged: boolean; children: string }) {
+  return (
+    <form action={acknowledge} className="inline">
+      <input type="hidden" name="code" value={code} />
+      <input type="hidden" name="acknowledged" value={acknowledged ? 'yes' : 'no'} />
+      <button className="link cursor-pointer">{children}</button>
+    </form>
+  );
+}
+
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string }> }) {
   const { userId, name, profile } = await requireProfile();
   const ctx = getCtx();
   const cur = profile.currency;
@@ -18,8 +60,9 @@ export default async function Dashboard() {
     listCheckIns(ctx, userId, 1),
     getLessonStates(ctx, userId),
   ]);
-  const s = summarise(items);
-  const warnings = profileWarnings(s);
+  const { summary: s, warnings, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
+  // While another check is open, settling "unreliable" on its own would change nothing.
+  const openChecks = warnings.filter((w) => isCompletenessCode(w.code) && w.code !== 'surplus_unreliable').length;
   const activeGoals = goals.filter((g) => g.status === 'active');
   const spentShare = s.monthlyIncome > 0 ? Math.round((s.monthlyExpenses / s.monthlyIncome) * 100) : 0;
   const monthsCovered = s.monthlyEssentialExpenses > 0 ? (s.emergencyFund / s.monthlyEssentialExpenses).toFixed(1) : null;
@@ -34,6 +77,7 @@ export default async function Dashboard() {
   return (
     <>
       <PageHeader title={`Hello, ${name}`}>Where things stand today.</PageHeader>
+      <Flash searchParams={searchParams} />
 
       {items.length === 0 ? (
         <section className="card mb-6">
@@ -46,9 +90,19 @@ export default async function Dashboard() {
           <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:gap-10">
             <div>
               <h2 id="month-heading" className="text-sm font-medium text-muted">{s.monthlySurplus < 0 ? 'Short each month' : 'Left over each month'}</h2>
-              <p className={`num mt-1 text-[2.5rem] font-semibold leading-none tracking-tight sm:text-5xl ${s.monthlySurplus < 0 ? 'text-danger' : 'text-brand'}`}>
-                {formatAmount(Math.abs(s.monthlySurplus), cur)}
-              </p>
+              {surplusReliable ? (
+                <p className={`num mt-1 text-[2.5rem] font-semibold leading-none tracking-tight sm:text-5xl ${s.monthlySurplus < 0 ? 'text-danger' : 'text-brand'}`}>
+                  {formatAmount(Math.abs(s.monthlySurplus), cur)}
+                </p>
+              ) : (
+                <>
+                  <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Not enough information yet</p>
+                  <p className="mt-2 text-sm text-muted">
+                    What is recorded so far leaves <span className="num">{formatAmount(s.monthlySurplus, cur)}</span>, but spending looks incomplete.{' '}
+                    <Link href="/profile" className="link">Add what is missing</Link>
+                  </p>
+                </>
+              )}
               {/* Where each month's income goes: spent, and what remains (or the gap). */}
               <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-brand-soft" role="img" aria-label={`Expenses take ${spentShare}% of income`}>
                 <div className={`h-full ${s.monthlySurplus < 0 ? 'bg-danger' : 'bg-ink'}`} style={{ width: `${Math.min(100, spentShare)}%` }} />
@@ -74,9 +128,23 @@ export default async function Dashboard() {
         <section className="mb-6 rounded-2xl border border-warn/25 bg-warn/5 p-5 sm:p-6">
           <h2 className="font-semibold text-warn">Worth a look</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-            {warnings.map((w) => <li key={w.code}>{w.message}</li>)}
+            {warnings.map((w) => (
+              <li key={w.code}>
+                {w.message}
+                {isCompletenessCode(w.code) && (w.code !== 'surplus_unreliable' || openChecks === 0) && (
+                  <> <AnswerForm code={w.code} acknowledged>{ANSWERS[w.code]}</AnswerForm></>
+                )}
+              </li>
+            ))}
           </ul>
         </section>
+      )}
+      {acknowledged.length > 0 && (
+        <ul className="mb-6 space-y-1 text-sm text-muted">
+          {acknowledged.map((code) => (
+            <li key={code}>You told FinPlan: “{ANSWERS[code]}”. <AnswerForm code={code} acknowledged={false}>Undo</AnswerForm></li>
+          ))}
+        </ul>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">

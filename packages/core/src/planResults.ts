@@ -4,6 +4,7 @@ import {
   calcSavingsProjection,
   compareDebtStrategies,
   ENGINE_VERSION,
+  monthlyInterest,
   type BudgetResult,
   type DebtComparison,
   type EmergencyFundResult,
@@ -41,6 +42,20 @@ export interface PlanResults {
   warnings: Warning[];
 }
 
+/**
+ * Whether the plan leaves out a category the profile spends on. Planning zero for a category is
+ * taken as a decision to cut it, unless any of that spending is marked essential.
+ */
+function omitsExpenses(items: Item[], inputs: PlanInputs): boolean {
+  const planned = new Map<string, number>();
+  for (const row of inputs.budget) planned.set(row.category, (planned.get(row.category) ?? 0) + row.amountMinor);
+  return items.some((item) => {
+    if (item.kind !== 'expense' || item.amountMinor === 0) return false;
+    const amount = planned.get(item.category);
+    return amount === undefined || (amount === 0 && item.essential);
+  });
+}
+
 export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInputs, startMonth: string): PlanResults {
   const summary = summarise(items);
   const goalById = new Map(goals.map((g) => [g.id, g]));
@@ -58,6 +73,13 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
   const toGoals = contributions.reduce((sum, c) => sum + c.amountMinor, 0);
   const unallocated = summary.monthlyIncome - budgeted - debtPayments - toGoals;
 
+  if (omitsExpenses(items, inputs)) {
+    warnings.push({
+      code: 'plan_omits_expenses',
+      severity: 'warn',
+      message: 'This plan sets nothing aside for some of the spending in your profile, so the money it shows as left over is too high.',
+    });
+  }
   if (contributions.length < inputs.goalContributions.length) {
     warnings.push({ code: 'goal_not_active', severity: 'info', message: 'A contribution to a goal that is not active was left out.' });
   }
@@ -74,7 +96,11 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
       message:
         chosen.reason === 'budget_below_minimums'
           ? 'The debt payments in this plan do not cover the minimum payments.'
-          : 'At this rate the debt is never paid off: interest grows faster than the payments.',
+          : debtPayments === 0
+            ? 'This plan puts nothing towards the debt, so it is never paid off.'
+            : debts.reduce((sum, d) => sum + monthlyInterest(d.balanceMinor, d.aprBps), 0) >= debtPayments
+              ? 'At this rate the debt is never paid off: interest uses up the payments.'
+              : 'At this rate the debt is not paid off within 50 years.',
     });
   }
 

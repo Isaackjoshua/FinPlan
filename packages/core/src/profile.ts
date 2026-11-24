@@ -21,10 +21,17 @@ import {
   type ItemKind,
   type ProfileDetails,
 } from './schemas';
+import type { CompletenessCode } from './warnings';
 
 const { profiles, profileItems, goals, profileRevisions } = schema;
 
-export interface Profile extends ProfileDetails {
+/** Profile details as stored. Agents have no way to set the fields added here. */
+interface StoredDetails extends ProfileDetails {
+  /** Completeness checks the user has said are right for them. */
+  acknowledgedWarnings?: CompletenessCode[];
+}
+
+export interface Profile extends StoredDetails {
   country: string;
   currency: string;
   revision: number;
@@ -49,7 +56,7 @@ export async function getProfile(ctx: Ctx, userId: string, exec: Executor = ctx.
     country: row.country,
     currency: row.currency,
     revision: row.revision,
-    ...openJson<ProfileDetails>(key, aad.profile(userId), row.data),
+    ...openJson<StoredDetails>(key, aad.profile(userId), row.data),
   };
 }
 
@@ -85,6 +92,14 @@ export async function listGoals(ctx: Ctx, userId: string, exec: Executor = ctx.d
 }
 
 // --- Writes ----------------------------------------------------------------
+
+/**
+ * The stored fields that `schema` says nothing about. A writer that does not know a field
+ * (an older app, or older code after a rollback) must not erase it, so replacements keep these.
+ */
+function unmentioned(stored: object, schema: { shape: object }): object {
+  return Object.fromEntries(Object.entries(stored).filter(([name]) => !(name in schema.shape)));
+}
 
 /** Creates the profile at onboarding. The currency is fixed from then on. */
 export async function setupProfile(ctx: Ctx, userId: string, input: z.input<typeof profileSetup>): Promise<void> {
@@ -154,22 +169,41 @@ export async function updateProfileDetails(
 ) {
   const details = profileDetails.parse(input);
   return mutate(ctx, userId, actor, options, async (tx, key) => {
+    const kept = unmentioned(await storedDetails(tx, key, userId), profileDetails);
     await tx
       .update(profiles)
-      .set({ data: sealJson(key, aad.profile(userId), details) })
+      .set({ data: sealJson(key, aad.profile(userId), { ...kept, ...details }) })
       .where(eq(profiles.userId, userId));
+  });
+}
+
+async function storedDetails(tx: Executor, key: Buffer, userId: string): Promise<StoredDetails> {
+  const [row] = await tx.select().from(profiles).where(eq(profiles.userId, userId));
+  return openJson<StoredDetails>(key, aad.profile(userId), row!.data);
+}
+
+/**
+ * Records that the user says a completeness check is right for them (they really do pay no
+ * rent), or takes that back. Only ever called on behalf of the signed-in user.
+ */
+export async function setWarningAcknowledged(ctx: Ctx, userId: string, code: CompletenessCode, acknowledged: boolean) {
+  return mutate(ctx, userId, { type: 'user' }, {}, async (tx, key) => {
+    const current = await storedDetails(tx, key, userId);
+    const others = (current.acknowledgedWarnings ?? []).filter((c) => c !== code);
+    const next: StoredDetails = { ...current, acknowledgedWarnings: acknowledged ? [...others, code] : others };
+    await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), next) }).where(eq(profiles.userId, userId));
   });
 }
 
 async function writeItem(tx: Executor, key: Buffer, userId: string, data: ItemData, id?: string): Promise<string> {
   if (id) {
-    const updated = await tx
-      .update(profileItems)
-      .set({ data: sealJson(key, aad.item(userId, id), data) })
-      // user_id is part of every WHERE clause: knowing an id is never enough.
-      .where(and(eq(profileItems.id, id), eq(profileItems.userId, userId), eq(profileItems.kind, data.kind), isNull(profileItems.archivedAt)))
-      .returning({ id: profileItems.id });
-    if (updated.length === 0) throw new NotFoundError(`Item ${id}`);
+    // user_id is part of every WHERE clause: knowing an id is never enough.
+    const mine = and(eq(profileItems.id, id), eq(profileItems.userId, userId), eq(profileItems.kind, data.kind), isNull(profileItems.archivedAt));
+    const [row] = await tx.select({ data: profileItems.data }).from(profileItems).where(mine);
+    if (!row) throw new NotFoundError(`Item ${id}`);
+    // Whatever the writer did not mention stays as it was.
+    const next = { ...openJson<ItemData>(key, aad.item(userId, id), row.data), ...data };
+    await tx.update(profileItems).set({ data: sealJson(key, aad.item(userId, id), next) }).where(mine);
     return id;
   }
   const newId = crypto.randomUUID();
@@ -235,8 +269,7 @@ export async function applyProfileChanges(
   return mutate<ProfileChangeResult>(ctx, userId, actor, options, async (tx, key) => {
     const result: ProfileChangeResult = { created: [], updated: [], archived: [], details: [] };
     if (details) {
-      const [row] = await tx.select().from(profiles).where(eq(profiles.userId, userId));
-      const current = openJson<ProfileDetails>(key, aad.profile(userId), row!.data);
+      const current = await storedDetails(tx, key, userId);
       // Only the fields that were given change; the rest keep their values.
       const given = Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined));
       await tx
@@ -287,7 +320,7 @@ export async function updateGoal(
     if (!row) throw new NotFoundError('Goal');
     const { status, ...fields } = changes;
     const current = openJson<GoalData>(key, aad.goal(userId, id), row.data);
-    const next = goalData.parse({ ...current, ...fields });
+    const next = { ...unmentioned(current, goalData), ...goalData.parse({ ...current, ...fields }) };
     await tx
       .update(goals)
       .set({
@@ -344,7 +377,9 @@ export async function restoreProfileRevision(ctx: Ctx, userId: string, revision:
 
     if (snapshot.profile) {
       const { country: _country, currency: _currency, revision: _revision, ...details } = snapshot.profile;
-      await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), details) }).where(eq(profiles.userId, userId));
+      // Undoing an agent's change must not take back what the user themselves has said since.
+      const { acknowledgedWarnings } = await storedDetails(tx, key, userId);
+      await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), { ...details, acknowledgedWarnings }) }).where(eq(profiles.userId, userId));
     }
 
     const keptItems = new Set(snapshot.items.map((item) => item.id));

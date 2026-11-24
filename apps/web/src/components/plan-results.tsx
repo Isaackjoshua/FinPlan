@@ -38,6 +38,9 @@ export function PlanResultsView({
   const chosen = debt ? debt[strategy ?? 'avalanche'] : null;
   const other = debt ? debt[(strategy ?? 'avalanche') === 'avalanche' ? 'snowball' : 'avalanche'] : null;
 
+  // Money "left" by a plan that forgets some spending is not really left.
+  const omitsExpenses = warnings.some((w) => w.code === 'plan_omits_expenses');
+
   return (
     <div className="space-y-4 rounded-lg bg-paper p-4 text-sm">
       <h3 className="font-semibold">What this plan works out to</h3>
@@ -55,7 +58,7 @@ export function PlanResultsView({
         <Row label="Towards goals" value={money(monthly.goalContributionsMinor)} />
         <Row
           strong
-          label={monthly.unallocatedMinor < 0 ? 'Over income by' : 'Not yet allocated'}
+          label={monthly.unallocatedMinor < 0 ? 'Over income by' : omitsExpenses ? 'Left before the spending not planned for' : 'Not yet allocated'}
           value={money(Math.abs(monthly.unallocatedMinor))}
           tone={monthly.unallocatedMinor < 0 ? 'bad' : undefined}
         />
@@ -85,7 +88,7 @@ export function PlanResultsView({
             <p className="text-danger">
               {chosen.reason === 'budget_below_minimums'
                 ? `The minimum payments need at least ${money(chosen.minimumBudgetMinor)} a month.`
-                : 'At this rate the debt is never paid off.'}
+                : 'At this rate the debt is not paid off within 50 years.'}
             </p>
           )}
         </div>

@@ -1,9 +1,11 @@
-import { authenticateToken, hashToken, listActivity, listGoals, listPlanVersions, revokeConnection, setupProfile, upsertItem, USER } from '@fin/core';
+import { authenticateToken, getUserKey, hashToken, listActivity, listGoals, listItems, listPlanVersions, openJson, revokeConnection, sealJson, setupProfile, setWarningAcknowledged, upsertItem, USER } from '@fin/core';
 import { eq, schema } from '@fin/db';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createUser, testCtx } from '../../../packages/core/test/helpers';
 import { INSTRUCTIONS, TOOLS } from '../src';
+import { groundingItems, incompleteItems } from '../../../packages/core/test/grounding';
+import { CONTRACT, matchesContract } from './contract';
 import { startStack } from './harness';
 
 const ctx = testCtx();
@@ -81,6 +83,89 @@ describe('what the server says about itself', () => {
       // Calculator and plan tools repeat the positioning.
       if (def.kind === 'calc' || /plan/.test(tool.name)) expect(tool.description, tool.name).toMatch(/not regulated investment advice/);
     }
+  });
+});
+
+describe('AI apps that connected before variable income', () => {
+  it('can call every tool with the arguments they know', async () => {
+    const agent = await stack.connect(await newUser(), ['finance:read']);
+    const { tools } = await agent.mcp.listTools();
+    for (const [name, { input }] of Object.entries(CONTRACT)) {
+      const now = tools.find((t) => t.name === name);
+      expect(now, name).toBeDefined();
+      expect(Object.keys(now!.inputSchema.properties ?? {}), name).toEqual(expect.arrayContaining(Object.keys(input.properties ?? {})));
+      expect(input.required ?? [], name).toEqual(expect.arrayContaining((now!.inputSchema as { required?: string[] }).required ?? []));
+    }
+  });
+
+  it('would notice an answer with a field they were not told about', async () => {
+    const agent = await stack.connect(await newUser(), ['finance:read']);
+    const answer = await agent.call('get_profile');
+    expect(() => matchesContract('get_profile', { ...answer, surprise: 1 })).toThrow();
+  });
+
+  it('still get valid answers when newer fields are stored', async () => {
+    const user = await newUser('TZS');
+    const agent = await stack.connect(user, ['finance:read', 'finance:write']);
+    for (const { id: _id, ...item } of groundingItems) await upsertItem(ctx, user, USER, item);
+    const { goal_id } = await agent.call('create_goal', { kind: 'other', title: 'Desk', target_amount_minor: 500 });
+    await agent.call('save_plan_version', { summary: 'Plan', budget: [{ category: 'food', amount_minor: 1 }], debt_strategy: 'avalanche', extra_debt_payment_minor: 1_000_000, goal_contributions: [{ goal_id, amount_minor: 5 }] });
+    await agent.call('log_check_in', { period_start: '2026-10-01', period_end: '2026-10-31', actuals: { income_minor: 5, spending: [] } });
+
+    // Put a field nobody knows into everything that is stored, at every level.
+    const key = await getUserKey(ctx, user);
+    const extend = (value: any): any =>
+      Array.isArray(value) ? value.map(extend) : value && typeof value === 'object' ? { ...Object.fromEntries(Object.entries(value).map(([k, v]) => [k, extend(v)])), newerField: 1 } : value;
+    const reseal = (aad: string, data: string) => sealJson(key, aad, extend(openJson(key, aad, data)));
+    for (const row of await ctx.db.select().from(schema.profileItems).where(eq(schema.profileItems.userId, user))) {
+      await ctx.db.update(schema.profileItems).set({ data: reseal(`profile_items:${user}:${row.id}`, row.data) }).where(eq(schema.profileItems.id, row.id));
+    }
+    for (const row of await ctx.db.select().from(schema.goals).where(eq(schema.goals.userId, user))) {
+      await ctx.db.update(schema.goals).set({ data: reseal(`goals:${user}:${row.id}`, row.data) }).where(eq(schema.goals.id, row.id));
+    }
+    for (const row of await ctx.db.select().from(schema.checkIns).where(eq(schema.checkIns.userId, user))) {
+      await ctx.db.update(schema.checkIns).set({ data: reseal(`check_ins:${user}:${row.id}`, row.data) }).where(eq(schema.checkIns.id, row.id));
+    }
+    const [profileRow] = await ctx.db.select().from(schema.profiles).where(eq(schema.profiles.userId, user));
+    await ctx.db.update(schema.profiles).set({ data: reseal(`profiles:${user}`, profileRow!.data) }).where(eq(schema.profiles.userId, user));
+    // Plan versions are immutable, so a newer one is inserted beside the first.
+    const [first] = await ctx.db.select().from(schema.planVersions).where(eq(schema.planVersions.userId, user));
+    const id = crypto.randomUUID();
+    const stored = extend(openJson(key, `plan_versions:${user}:${first!.id}`, first!.data));
+    await ctx.db.insert(schema.planVersions).values({ ...first!, id, versionNumber: 2, data: sealJson(key, `plan_versions:${user}:${id}`, stored) });
+    expect((await listItems(ctx, user))[0]).toHaveProperty('newerField');
+
+    const profile = await agent.call('get_profile', { sections: ['summary', 'income', 'expenses', 'debts', 'savings'] });
+    expect(profile.expenses).toHaveLength(8);
+    await agent.call('list_goals');
+    await agent.call('list_check_ins');
+    await agent.call('get_progress');
+    for (const detail of ['summary', 'full']) {
+      const { plan } = await agent.call('get_plan_version', { version: 2, detail });
+      expect(plan.inputs).toMatchObject({ budget: [{ category: 'food', amount_minor: 1 }], goal_contributions: [{ goal_id, amount_minor: 5 }] });
+      expect(plan.results.debt.avalanche.feasible).toBe(true);
+    }
+  });
+});
+
+describe('a profile that looks incomplete', () => {
+  it('is reported to agents on reading, writing and planning', async () => {
+    const user = await newUser('TZS');
+    const agent = await stack.connect(user, ['finance:read', 'finance:write']);
+    for (const { id: _id, ...item } of incompleteItems) await upsertItem(ctx, user, USER, item);
+    const codes = (list: { code: string }[]) => list.map((w) => w.code);
+
+    const { summary, revision } = await agent.call('get_profile');
+    expect(codes(summary.warnings)).toEqual(['no_housing_recorded', 'no_food_recorded', 'surplus_unreliable']);
+    const written = await agent.call('update_profile', { expected_revision: revision, details: { household_size: 1 } });
+    expect(codes(written.warnings)).toEqual(codes(summary.warnings));
+    const saved = await agent.call('save_plan_version', { summary: 'Too good to be true', budget: [] });
+    expect(codes(saved.results.warnings)).toContain('plan_omits_expenses');
+
+    // Only the user can settle a check, and agents then stop being told about it.
+    await refused(() => agent.call('update_profile', { expected_revision: written.revision, details: { acknowledged_warnings: ['no_food_recorded'] } }));
+    for (const code of ['no_housing_recorded', 'no_food_recorded', 'surplus_unreliable'] as const) await setWarningAcknowledged(ctx, user, code, true);
+    expect((await agent.call('get_profile')).summary.warnings).toEqual([]);
   });
 });
 

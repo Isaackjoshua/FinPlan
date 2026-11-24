@@ -57,6 +57,26 @@ export const ASSUMPTIONS = 'Assumes fixed rates, interest applied monthly (annua
 export const MINOR_NOTE = 'Amounts are whole numbers of minor units (for example cents): 125000 means 1,250.00 in a two-decimal currency.';
 export const IDEMPOTENCY_NOTE = 'Pass a fresh `idempotency_key` so that retrying after a timeout cannot apply the change twice.';
 
+/**
+ * Trims an answer to the fields its schema lists, at every level. Schemas are strict, and apps
+ * check answers against the tool list they already hold, so a newly stored field must never
+ * reach one by accident. Anything else wrong with the answer is left for validation to report.
+ */
+export function fit(schema: unknown, value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) return fit(schema.unwrap(), value);
+  if (schema instanceof z.ZodArray) return Array.isArray(value) ? value.map((one) => fit(schema.element, one)) : value;
+  if (schema instanceof z.ZodUnion) {
+    const fitted = schema.options.map((option) => [option as z.ZodType, fit(option, value)] as const);
+    return (fitted.find(([option, one]) => option.safeParse(one).success) ?? [null, value])[1];
+  }
+  if (schema instanceof z.ZodObject) {
+    if (typeof value !== 'object' || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.entries(value).flatMap(([name, one]) => (Object.hasOwn(schema.shape, name) ? [[name, fit(schema.shape[name], one)]] : [])));
+  }
+  return value;
+}
+
 // --- Schema pieces -------------------------------------------------------------
 
 /** "This value or null". */

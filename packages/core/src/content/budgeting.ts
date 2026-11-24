@@ -77,7 +77,7 @@ export const budgetingLessons: Lesson[] = [
       { type: 'example', title: 'Six months of income', lines: [
         '45,000, 70,000, 38,000, 90,000, 52,000, 41,000',
         'The average is 56,000, but two months fell below 42,000.',
-        'A budget built on 40,000 survives every one of these months. A budget built on 56,000 fails in four of them.',
+        'A budget built on 38,000 survives every one of these months. A budget built on 56,000 fails in four of them.',
       ] },
       { type: 'heading', text: 'Let good months pay for lean ones' },
       { type: 'text', text: 'Anything earned above the baseline goes into a buffer first. In a lean month you draw from the buffer to reach the baseline. Once the buffer holds a month or two of expenses, extra income can go to goals and debts.' },

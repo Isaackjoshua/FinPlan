@@ -3,15 +3,14 @@ import {
   assignLessons,
   checkInInput,
   checkInVariance,
+  checkProfile,
   createGoal,
   getCurrentPlan,
   GOAL_KINDS,
   GOAL_STATUSES,
   listItems,
   logCheckIn,
-  profileWarnings,
   savePlanVersion,
-  summarise,
   updateGoal,
   type Actor,
 } from '@fin/core';
@@ -65,7 +64,7 @@ const updateProfileTool = tool({
     items: z
       .array(
         z.discriminatedUnion('op', [
-          z.strictObject({ op: z.literal('upsert'), id: z.uuid().optional().describe('Omit to create; give an existing id to replace that item.'), item }),
+          z.strictObject({ op: z.literal('upsert'), id: z.uuid().optional().describe('Omit to create; give an existing id to replace that item. Anything it holds that these fields do not cover is kept.'), item }),
           z.strictObject({ op: z.literal('archive'), id: z.uuid() }),
         ]),
       )
@@ -82,7 +81,7 @@ const updateProfileTool = tool({
     warnings: z.array(warning).describe('Things in the resulting profile worth raising with the user.'),
   }),
   async run({ expected_revision, details, items }, auth, { ctx }) {
-    await needProfile(ctx, auth.userId);
+    const { acknowledgedWarnings } = await needProfile(ctx, auth.userId);
     if (!details && !items?.length) throw new ToolError('Nothing to change: give `details`, `items`, or both.');
     const { revision, result } = await applyProfileChanges(
       ctx,
@@ -99,7 +98,7 @@ const updateProfileTool = tool({
         updated: result.updated,
         archived: result.archived,
         details_changed: detailsChanged,
-        warnings: profileWarnings(summarise(await listItems(ctx, auth.userId))),
+        warnings: checkProfile(await listItems(ctx, auth.userId), acknowledgedWarnings).warnings,
       },
       touched: {
         entityType: 'profile',

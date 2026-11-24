@@ -1,6 +1,7 @@
 import { eq, schema } from '@fin/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  applyProfileChanges,
   archiveItem,
   ConflictError,
   createGoal,
@@ -15,9 +16,12 @@ import {
   logCheckIn,
   NotFoundError,
   openJson,
+  restoreProfileRevision,
   revertToVersion,
   savePlanVersion,
+  sealJson,
   setupProfile,
+  setWarningAcknowledged,
   updateGoal,
   updateProfileDetails,
   upsertItem,
@@ -114,6 +118,65 @@ describe('goals', () => {
     expect(await listGoals(ctx, alice)).toEqual([
       { id, kind: 'emergency_fund', title: 'Three months', targetAmountMinor: 900000, currentAmountMinor: 100000, priority: 3, status: 'paused' },
     ]);
+  });
+});
+
+describe('fields a writer does not know about', () => {
+  it('are kept when an item, a goal or the details are rewritten', async () => {
+    const user = await createUser(ctx);
+    await setupProfile(ctx, user, { country: 'TZ', currency: 'TZS' });
+    const key = await getUserKey(ctx, user);
+    const { result: itemId } = await upsertItem(ctx, user, USER, { kind: 'income', label: 'Work', amountMinor: 100, frequency: 'monthly' });
+    const { result: goalId } = await createGoal(ctx, user, USER, { kind: 'other', title: 'Desk', targetAmountMinor: 500, targetDate: '2027-01-01' });
+    // As a newer version of FinPlan might have stored them.
+    const [item] = await listItems(ctx, user);
+    const [goal] = await listGoals(ctx, user);
+    const { id: _i, ...itemData } = item!;
+    const { id: _g, status: _s, ...goalData } = goal!;
+    await ctx.db.update(schema.profileItems).set({ data: sealJson(key, `profile_items:${user}:${itemId}`, { ...itemData, floorMinor: 90 }) }).where(eq(schema.profileItems.id, itemId));
+    await ctx.db.update(schema.goals).set({ data: sealJson(key, `goals:${user}:${goalId}`, { ...goalData, fundingOrder: 2 }) }).where(eq(schema.goals.id, goalId));
+    await setWarningAcknowledged(ctx, user, 'no_food_recorded', true);
+
+    await applyProfileChanges(ctx, user, AGENT, { details: { notes: 'Hi' }, changes: [{ op: 'upsert', id: itemId, item: { kind: 'income', label: 'Freelance', amountMinor: 120, frequency: 'monthly' } }] });
+    expect(await listItems(ctx, user)).toEqual([{ id: itemId, kind: 'income', label: 'Freelance', amountMinor: 120, frequency: 'monthly', floorMinor: 90 }]);
+
+    // Clearing a field the writer does know still clears it.
+    await updateGoal(ctx, user, USER, goalId, { title: 'Big desk', targetDate: undefined });
+    const [after] = await listGoals(ctx, user);
+    expect(after).toMatchObject({ title: 'Big desk', fundingOrder: 2 });
+    expect(after!.targetDate).toBeUndefined();
+
+    await updateProfileDetails(ctx, user, USER, { householdSize: 2 });
+    const profile = (await getProfile(ctx, user))!;
+    expect(profile).toMatchObject({ householdSize: 2, acknowledgedWarnings: ['no_food_recorded'] });
+    expect(profile.notes).toBeUndefined();
+  });
+});
+
+describe('answers to completeness checks', () => {
+  it('can be given and taken back, and survive undoing an agent change', async () => {
+    const user = await createUser(ctx);
+    await setupProfile(ctx, user, { country: 'TZ', currency: 'TZS' });
+    const before = (await getProfile(ctx, user))!.revision;
+    await upsertItem(ctx, user, AGENT, { kind: 'income', label: 'Work', amountMinor: 100, frequency: 'monthly' });
+    await setWarningAcknowledged(ctx, user, 'no_housing_recorded', true);
+    await setWarningAcknowledged(ctx, user, 'no_housing_recorded', true);
+    expect((await getProfile(ctx, user))!.acknowledgedWarnings).toEqual(['no_housing_recorded']);
+
+    await restoreProfileRevision(ctx, user, before);
+    expect(await listItems(ctx, user)).toEqual([]);
+    expect((await getProfile(ctx, user))!.acknowledgedWarnings).toEqual(['no_housing_recorded']);
+
+    await setWarningAcknowledged(ctx, user, 'no_housing_recorded', false);
+    expect((await getProfile(ctx, user))!.acknowledgedWarnings).toEqual([]);
+  });
+
+  it('cannot be given through an agent\'s profile update', async () => {
+    const user = await createUser(ctx);
+    await setupProfile(ctx, user, { country: 'TZ', currency: 'TZS' });
+    const details = { notes: 'x', acknowledgedWarnings: ['no_food_recorded'] };
+    await applyProfileChanges(ctx, user, AGENT, { details });
+    expect((await getProfile(ctx, user))!.acknowledgedWarnings).toBeUndefined();
   });
 });
 

@@ -2,7 +2,7 @@ import { Empty, Flash, humanise, PageHeader } from '@/components/ui';
 import { run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
-import { dismissAssignment, getLessonStates, listItems, listLessons, profileWarnings, recommendLessons, summarise, TOPICS, type Lesson, type LessonState } from '@fin/core';
+import { checkProfile, dismissAssignment, getLessonStates, listItems, listLessons, recommendLessons, TOPICS, type Lesson, type LessonState } from '@fin/core';
 import Link from 'next/link';
 
 export const metadata = { title: 'Lessons' };
@@ -36,17 +36,17 @@ function LessonCard({ lesson, state, children }: { lesson: Lesson; state?: Lesso
 }
 
 export default async function LessonsPage({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string; topic?: string; level?: string }> }) {
-  const { userId } = await requireProfile();
+  const { userId, profile } = await requireProfile();
   const ctx = getCtx();
   const params = await searchParams;
   const [states, items] = await Promise.all([getLessonStates(ctx, userId), listItems(ctx, userId)]);
 
   const all = listLessons();
   const assigned = all.filter((l) => states.get(l.slug)?.assignment?.status === 'assigned');
-  const summary = summarise(items);
+  const { summary, warnings } = checkProfile(items, profile.acknowledgedWarnings);
   const completed = new Set([...states].filter(([, s]) => s.status === 'completed').map(([slug]) => slug));
   const assignedSlugs = new Set(assigned.map((l) => l.slug));
-  const recommended = recommendLessons(summary, profileWarnings(summary), completed).filter((l) => !assignedSlugs.has(l.slug));
+  const recommended = recommendLessons(summary, warnings, completed).filter((l) => !assignedSlugs.has(l.slug));
 
   const topic = TOPICS.find((t) => t === params.topic);
   const level = [1, 2, 3].find((n) => String(n) === params.level) as 1 | 2 | 3 | undefined;

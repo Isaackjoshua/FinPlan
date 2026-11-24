@@ -1,5 +1,6 @@
 import {
   checkInVariance,
+  checkProfile,
   getCurrentPlan,
   getLesson,
   getPlanVersion,
@@ -12,8 +13,6 @@ import {
   listItems,
   listLessons,
   listPlanVersions,
-  profileWarnings,
-  summarise,
   TAGS,
   TOPICS,
   type Ctx,
@@ -99,7 +98,7 @@ const getProfileTool = tool({
     // Line items leave their label out of the main object and carry it in `user_text`.
     const lines = (kind: string) =>
       items.filter((item) => item.kind === kind).map(({ kind: _kind, label: text, ...rest }) => ({ ...toSnake(rest), user_text: { label: text } }));
-    const totals = summarise(items);
+    const { summary: totals, warnings } = checkProfile(items, profile.acknowledgedWarnings);
     return {
       result: {
         currency: profile.currency,
@@ -119,7 +118,7 @@ const getProfileTool = tool({
             ...(profile.payFrequency && { pay_frequency: profile.payFrequency }),
             ...(profile.householdSize && { household_size: profile.householdSize }),
             user_text: profile.notes ? { notes: profile.notes } : {},
-            warnings: profileWarnings(totals),
+            warnings,
           },
         }),
         ...(wants('income') && { income: lines('income') }),

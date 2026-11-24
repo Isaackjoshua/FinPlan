@@ -78,7 +78,11 @@ let dash = (await get('/dashboard')).html;
 const txt = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ');
 check('dashboard shows income', txt(dash).includes('KES 120,000.00'), txt(dash).slice(0, 400));
 check('dashboard shows expenses (45,000 + 5,000×52/12)', txt(dash).includes('KES 66,666.67'));
-check('dashboard shows surplus (120,000 − 66,666.67 − 3,000)', txt(dash).includes('KES 50,333.33'));
+check('dashboard does not vouch for a surplus from two expenses', txt(dash).includes('Not enough information yet'));
+check('dashboard still shows what is recorded (120,000 − 66,666.67 − 3,000)', txt(dash).includes('KES 50,333.33'));
+await submit('/dashboard', (f) => f.hidden.code === 'surplus_unreliable', {});
+dash = (await get('/dashboard')).html;
+check('the user can say that is all', txt(dash).includes('Left over each month') && !txt(dash).includes('Not enough information yet'));
 check('emergency fund covers 1.0 months', txt(dash).includes('1.0 months'));
 
 await submit('/goals', (f) => has('title')(f) && !f.hidden.id, { title: 'Three months of cover', kind: 'emergency_fund', target: '200000', current: '66666.67', priority: '1' });

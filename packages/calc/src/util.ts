@@ -6,7 +6,7 @@
  */
 
 /** Bump when any calculation changes, so saved plans record which rules produced them. */
-export const ENGINE_VERSION = '1.0.0';
+export const ENGINE_VERSION = '1.0.1';
 
 export const MAX_AMOUNT = 1e13;
 export const MAX_RATE_BPS = 100_000;

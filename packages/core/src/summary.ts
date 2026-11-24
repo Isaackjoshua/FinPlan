@@ -41,7 +41,8 @@ export function summarise(items: Item[]): Summary {
       }
       case 'debt':
         s.totalDebt += item.balanceMinor;
-        s.monthlyDebtMinimums += item.minimumPaymentMinor;
+        // A cleared debt has nothing left to pay, whatever its minimum used to be.
+        if (item.balanceMinor > 0) s.monthlyDebtMinimums += item.minimumPaymentMinor;
         if (item.balanceMinor > 0) s.highestAprBps = Math.max(s.highestAprBps ?? 0, item.aprBps);
         break;
       case 'savings':

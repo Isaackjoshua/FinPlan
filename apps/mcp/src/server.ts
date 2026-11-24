@@ -12,7 +12,7 @@ import {
 import { Hono } from 'hono';
 import { INSTRUCTIONS } from './instructions';
 import { TOOL_BY_NAME, TOOLS, type ToolAuth, type ToolDef, type Touched } from './tools';
-import { explain, portable } from './wire';
+import { explain, fit, portable } from './wire';
 
 export interface Limits {
   /** Requests of any kind, per connection. */
@@ -110,7 +110,7 @@ export function createMcpApp(options: McpAppOptions) {
                 ? await idempotent(ctx, { userId: state.userId, connectionId: state.connectionId, key, tool: def.name, args: rest }, run)
                 : await run();
             await record(state, def, def.name, 'ok', started, out.touched);
-            const result = out.result as Record<string, unknown>;
+            const result = fit(def.output, out.result) as Record<string, unknown>;
             return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result };
           } catch (error) {
             const expected = explain(error);

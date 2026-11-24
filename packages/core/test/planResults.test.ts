@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { computePlanResults, createGoal, getCurrentPlan, planInputs, savePlanVersion, setupProfile, upsertItem, USER, type Goal, type Item } from '../src';
+import { debt, groundingItems, tzs } from './grounding';
 import { createUser, testCtx } from './helpers';
 
 const G1 = '11111111-1111-4111-8111-111111111111';
@@ -30,7 +31,7 @@ const inputs = (over: object = {}) =>
 describe('computePlanResults', () => {
   it('works out where the money goes and when things are reached', () => {
     const r = computePlanResults(items, goals, inputs(), '2026-11');
-    expect(r.engineVersion).toBe('1.0.0');
+    expect(r.engineVersion).toBe('1.0.1');
     expect(r.monthly).toEqual({
       incomeMinor: 500_000,
       budgetedSpendingMinor: 170_000,
@@ -49,7 +50,7 @@ describe('computePlanResults', () => {
   });
 
   it('warns when the plan spends more than comes in', () => {
-    const r = computePlanResults(items, goals, inputs({ budget: [{ category: 'housing', amountMinor: 450_000 }] }), '2026-11');
+    const r = computePlanResults(items, goals, inputs({ budget: [{ category: 'housing', amountMinor: 450_000 }, { category: 'entertainment', amountMinor: 0 }] }), '2026-11');
     expect(r.monthly.unallocatedMinor).toBe(-50_000);
     expect(r.warnings.map((w) => w.code)).toEqual(['plan_exceeds_income']);
   });
@@ -66,6 +67,29 @@ describe('computePlanResults', () => {
     const big: Item[] = [...items, { id: 'd3', kind: 'debt', label: 'Loan', debtKind: 'personal_loan', balanceMinor: 50_000_000, aprBps: 3600, minimumPaymentMinor: 0 }];
     const r = computePlanResults(big, goals, inputs({ extraDebtPaymentMinor: 0 }), '2026-11');
     expect(r.warnings).toEqual([expect.objectContaining({ code: 'debt_never_cleared', message: expect.stringContaining('never paid off') })]);
+  });
+
+  it('warns when the plan leaves out spending the profile records', () => {
+    const codesFor = (budget: object[], from: Item[] = items) => computePlanResults(from, goals, inputs({ budget }), '2026-11').warnings.map((w) => w.code);
+    expect(codesFor([{ category: 'housing', amountMinor: 150_000 }])).toEqual(['plan_omits_expenses']);
+    // Planning nothing for a want is a choice; planning nothing for an essential is not.
+    expect(codesFor([{ category: 'housing', amountMinor: 150_000 }, { category: 'entertainment', amountMinor: 0 }])).toEqual([]);
+    expect(codesFor([{ category: 'housing', amountMinor: 0 }, { category: 'entertainment', amountMinor: 0 }])).toEqual(['plan_omits_expenses']);
+    expect(codesFor([], [])).not.toContain('plan_omits_expenses');
+  });
+
+  it('does not let an empty budget pass for money left over (grounding case)', () => {
+    const r = computePlanResults(groundingItems, [], planInputs.parse({ budget: [] }), '2026-11');
+    expect(r.monthly.unallocatedMinor).toBe(tzs(200_000));
+    expect(r.warnings.map((w) => w.code)).toEqual(['plan_omits_expenses']);
+  });
+
+  it('does not blame interest for a debt that has none', () => {
+    const message = (from: Item[], extraDebtPaymentMinor: number) =>
+      computePlanResults(from, [], planInputs.parse({ budget: [], debtStrategy: 'avalanche', extraDebtPaymentMinor }), '2026-11').warnings.find((w) => w.code === 'debt_never_cleared')?.message;
+    expect(message([debt], 0)).toBe('This plan puts nothing towards the debt, so it is never paid off.');
+    expect(message([debt], 1)).toBe('At this rate the debt is not paid off within 50 years.');
+    expect(message([debt], tzs(10_000))).toBeUndefined();
   });
 
   it('has no debt section without debts, and no debt payments either', () => {
