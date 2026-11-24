@@ -4,6 +4,7 @@ import { money, optionalMoney, run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
 import {
+  changedSince,
   EXPENSE_CATEGORIES,
   formatAmount,
   listGoals,
@@ -118,6 +119,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           <h2 className="text-lg font-semibold">Current plan</h2>
           {current && <p className="text-xs text-muted">Version {current.version} · saved {when(current.savedAt)} by {current.savedBy === 'agent' ? 'your agent' : 'you'}</p>}
         </div>
+        {current && changedSince(current, profile) && <p className="mb-3 text-sm text-warn">Your profile or goals have changed since this was saved, so its figures may be out of date. Save a new version to work them out again.</p>}
         {current ? <PlanDetails plan={current} currency={cur} goalTitles={goalTitles} /> : <Empty>No plan yet. Create one below, or connect an agent to build it with you.</Empty>}
       </section>
 

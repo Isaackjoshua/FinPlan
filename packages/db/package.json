@@ -7,6 +7,7 @@
   "scripts": {
     "generate": "drizzle-kit generate",
     "migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts",
+    "rollback": "tsx --env-file-if-exists=../../.env src/rollback.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

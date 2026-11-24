@@ -29,6 +29,27 @@
       "when": 1794477771860,
       "tag": "0003_shiny_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795511307988,
+      "tag": "0004_check_in_void",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795511308637,
+      "tag": "0005_income_actuals",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795511401389,
+      "tag": "0006_allocations",
+      "breakpoints": true
     }
   ]
 }

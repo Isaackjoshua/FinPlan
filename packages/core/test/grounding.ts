@@ -36,3 +36,7 @@ export const incompleteItems: Item[] = [income, claude, data, savings, debt];
 /** The same profile, with income recorded as it really is: 200,000 at the least, and nothing else known. */
 export const variableIncome: Item = { ...income, variability: 'variable' } as Item;
 export const variableItems: Item[] = groundingItems.map((item) => (item === income ? variableIncome : item));
+
+/** As the user classifies it: gym, Claude and internet are commitments, the rest is survival. */
+const committed = new Set(['claude', 'gym', 'data']);
+export const tieredItems: Item[] = variableItems.map((item) => (item.kind === 'expense' ? { ...item, tier: committed.has(item.id) ? 'committed' : 'survival' } : item));

@@ -1,10 +1,12 @@
 import { eq, schema } from '@fin/db';
 import { listActivity, listConnections, revokeConnection } from './agents';
+import { listAllocations } from './allocations';
 import { listCheckIns } from './checkins';
 import type { Ctx } from './context';
 import { getLessonStates } from './lessons';
 import { listPlanVersions } from './plans';
 import { getProfile, listGoals, listItems } from './profile';
+import { listIncome } from './receipts';
 
 /** Everything FinPlan holds about a user, decrypted, for them to download. */
 export async function exportUserData(ctx: Ctx, userId: string) {
@@ -12,12 +14,14 @@ export async function exportUserData(ctx: Ctx, userId: string) {
     .select({ name: schema.user.name, email: schema.user.email, createdAt: schema.user.createdAt })
     .from(schema.user)
     .where(eq(schema.user.id, userId));
-  const [profile, items, goals, planVersions, checkIns, lessons, connections, activity] = await Promise.all([
+  const [profile, items, goals, planVersions, checkIns, incomeReceived, allocations, lessons, connections, activity] = await Promise.all([
     getProfile(ctx, userId),
     listItems(ctx, userId),
     listGoals(ctx, userId),
     listPlanVersions(ctx, userId),
-    listCheckIns(ctx, userId, 1000),
+    listCheckIns(ctx, userId, 1000, { includeVoided: true }),
+    listIncome(ctx, userId, { includeVoided: true, limit: 5000 }),
+    listAllocations(ctx, userId, { limit: 5000 }),
     getLessonStates(ctx, userId),
     listConnections(ctx, userId),
     listActivity(ctx, userId, { limit: 200 }),
@@ -31,6 +35,8 @@ export async function exportUserData(ctx: Ctx, userId: string) {
     goals,
     planVersions,
     checkIns,
+    incomeReceived,
+    allocations,
     lessons: [...lessons].map(([slug, state]) => ({ slug, ...state })),
     connectedApps: connections,
     recentAppActivity: activity.map(({ userId: _user, ...row }) => row),

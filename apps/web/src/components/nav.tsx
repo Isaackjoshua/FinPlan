@@ -29,6 +29,8 @@ const PRIMARY = [
 /** Under "More" on phones. */
 const SECONDARY = [
   { href: '/profile', label: 'Profile' },
+  { href: '/cash-flow', label: 'Cash flow' },
+  { href: '/share-out', label: 'Share out money' },
   { href: '/lessons', label: 'Lessons' },
   { href: '/agents', label: 'AI apps' },
   { href: '/account', label: 'Account' },

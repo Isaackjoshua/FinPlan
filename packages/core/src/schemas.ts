@@ -1,3 +1,4 @@
+import { FIRST_DAY, LAST_DAY } from '@fin/calc';
 import { z } from 'zod';
 import { FREQUENCIES, isSupportedCurrency } from './money';
 
@@ -22,6 +23,8 @@ export const rateBps = z.number().int().min(0).max(100_000);
 
 export const frequency = z.enum(FREQUENCIES);
 export const isoDate = z.iso.date();
+/** A date that is stepped through day by day or month by month, so it has to be one plans can be about. */
+export const plannedDate = isoDate.refine((date) => date >= FIRST_DAY && date <= LAST_DAY, `Use a date between ${FIRST_DAY} and ${LAST_DAY}`);
 
 export const EXPENSE_CATEGORIES = [
   'housing',
@@ -53,6 +56,14 @@ export const profileDetails = z.object({
 });
 export type ProfileDetails = z.infer<typeof profileDetails>;
 
+/**
+ * Survival: what you cannot live without. Committed: owed or awkward to stop, but you would
+ * live without it. Discretionary: the rest.
+ */
+export const EXPENSE_TIERS = ['survival', 'committed', 'discretionary'] as const;
+export type ExpenseTier = (typeof EXPENSE_TIERS)[number];
+const dayOfMonth = z.number().int().min(1).max(31);
+
 export const INCOME_VARIABILITY = ['fixed', 'variable'] as const;
 
 export const itemData = z.discriminatedUnion('kind', [
@@ -66,6 +77,10 @@ export const itemData = z.discriminatedUnion('kind', [
     /** What a typical and a good month bring in, when income is variable. Null clears one; either may be unknown. */
     typicalMinor: amount.nullable().optional(),
     highMinor: amount.nullable().optional(),
+    /** Monthly income: the days of the month between which it usually arrives. */
+    arrival: z.object({ fromDay: dayOfMonth, toDay: dayOfMonth }).nullable().optional(),
+    /** Income that is not monthly: the next date it arrives. */
+    nextPayDate: plannedDate.nullable().optional(),
   }),
   z.object({
     kind: z.literal('expense'),
@@ -73,7 +88,14 @@ export const itemData = z.discriminatedUnion('kind', [
     amountMinor: amount,
     frequency,
     category: expenseCategory,
+    /** True only for survival spending once there is a tier, so that what reads this sizes an emergency fund cautiously. */
     essential: z.boolean(),
+    tier: z.enum(EXPENSE_TIERS).optional(),
+    nextDueDate: plannedDate.nullable().optional(),
+    /** The day of the month it is really due on, kept when a short month moves `nextDueDate` earlier. Set by the platform. */
+    dueDay: dayOfMonth.optional(),
+    /** Already set aside for the next bill. */
+    reservedMinor: amount.nullable().optional(),
   }),
   z.object({
     kind: z.literal('debt'),
@@ -82,6 +104,7 @@ export const itemData = z.discriminatedUnion('kind', [
     balanceMinor: amount,
     aprBps: rateBps,
     minimumPaymentMinor: amount,
+    nextDueDate: plannedDate.nullable().optional(),
   }),
   z.object({
     kind: z.literal('savings'),
@@ -97,6 +120,9 @@ export type ItemData = z.infer<typeof itemData>;
 export const completeItem = itemData.superRefine((item, issues) => {
   if (item.kind !== 'income') return;
   const fail = (path: string, message: string) => issues.addIssue({ code: 'custom', path: [path], message });
+  if (item.arrival && item.frequency !== 'monthly') fail('arrival', 'Days of the month only suit monthly income; give the next date it arrives instead');
+  if (item.arrival && item.arrival.fromDay > item.arrival.toDay) fail('arrival', 'The first day cannot be after the last');
+  if (item.nextPayDate && item.frequency === 'monthly') fail('nextPayDate', 'For monthly income give the days of the month instead');
   const typical = item.typicalMinor ?? null;
   const high = item.highMinor ?? null;
   if (item.variability !== 'variable') {
@@ -119,6 +145,14 @@ export const goalData = z.object({
   currentAmountMinor: amount.default(0),
   targetDate: isoDate.optional(),
   priority: z.number().int().min(1).max(5).default(3),
+  /** Where the goal comes in line for money, 1 first. Goals without one come after, by priority. */
+  fundingOrder: z.number().int().min(1).max(99).nullable().optional(),
+  /** The most to put towards it in one month. */
+  monthlyCapMinor: amount.nullable().optional(),
+  /** The savings the goal's money sits in. Its balance is then the progress, so the two cannot disagree. */
+  savingsItemId: z.uuid().nullable().optional(),
+  /** What the goal is made up of. The target is then their total. */
+  parts: z.array(z.object({ label: text(80), amountMinor: amount, done: z.boolean().default(false) })).max(20).nullable().optional(),
 });
 export type GoalData = z.infer<typeof goalData>;
 export const goalStatus = z.enum(GOAL_STATUSES);
@@ -143,15 +177,28 @@ export const planVersionInput = z.object({
 
 export const checkInInput = z
   .object({
-    periodStart: isoDate,
-    periodEnd: isoDate,
+    periodStart: plannedDate,
+    periodEnd: plannedDate,
     actuals: z.object({
       incomeMinor: amount,
+      /** Confirms that an income of 0 means nothing came in, rather than that nobody said. */
+      noIncome: z.boolean().optional(),
       spending: z.array(z.object({ category: expenseCategory, amountMinor: amount })).max(20),
       debtPaymentsMinor: amount.default(0),
       savingsAddedMinor: amount.default(0),
     }),
     note: optionalText(1000),
   })
+  .refine((v) => !(v.actuals.noIncome && v.actuals.incomeMinor > 0), { message: 'Income was given, so "no income" does not apply', path: ['actuals', 'noIncome'] })
   .refine((v) => v.periodEnd >= v.periodStart, { message: 'Period end is before its start', path: ['periodEnd'] });
 export type CheckInInput = z.infer<typeof checkInInput>;
+
+export const incomeReceiptInput = z.object({
+  receivedOn: plannedDate,
+  amountMinor: amount.min(1),
+  /** Who or what it came from. */
+  source: optionalText(120),
+  /** The income item it belongs to, if it is one of those recorded. */
+  itemId: z.uuid().optional(),
+});
+export type IncomeReceiptInput = z.infer<typeof incomeReceiptInput>;

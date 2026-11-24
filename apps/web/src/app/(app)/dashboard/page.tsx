@@ -1,20 +1,23 @@
 import { ScenarioNotes, ScenarioTable } from '@/components/income-scenarios';
 import { monthName } from '@/components/plan-results';
-import { Empty, Flash, formatPeriod, PageHeader } from '@/components/ui';
-import { run, str } from '@/lib/forms';
+import { Empty, Flash, formatDay, formatPeriod, humanise, PageHeader } from '@/components/ui';
+import { run, str, today } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
 import {
-  checkProfile,
+  changedSince,
   COMPLETENESS_CODES,
+  effectiveGoals,
+  expenseTiers,
   formatAmount,
   getCurrentPlan,
   getLessonStates,
   listCheckIns,
-  listGoals,
-  listItems,
   listLessons,
+  loadProfileCheck,
+  obligations,
   recommendLessons,
+  setAside,
   setWarningAcknowledged,
   type CompletenessCode,
 } from '@fin/core';
@@ -54,14 +57,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const { userId, name, profile } = await requireProfile();
   const ctx = getCtx();
   const cur = profile.currency;
-  const [items, goals, plan, checkIns, lessonStates] = await Promise.all([
-    listItems(ctx, userId),
-    listGoals(ctx, userId),
+  const [check, plan, checkIns, lessonStates] = await Promise.all([
+    loadProfileCheck(ctx, userId, profile, today()),
     getCurrentPlan(ctx, userId),
     listCheckIns(ctx, userId, 1),
     getLessonStates(ctx, userId),
   ]);
-  const { summary: s, warnings, scenarios, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
+  const { items, summary: s, warnings, scenarios, surplusReliable, acknowledged } = check;
+  const goals = effectiveGoals(check.goals, items);
+  const bills = obligations(items, today(), check.given);
+  const tiers = expenseTiers(items);
   // While another check is open, settling "unreliable" on its own would change nothing.
   const openChecks = warnings.filter((w) => isCompletenessCode(w.code) && w.code !== 'surplus_unreliable').length;
   const activeGoals = goals.filter((g) => g.status === 'active');
@@ -116,14 +121,18 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <div className="flex gap-1.5"><dt className="text-muted">{scenarios ? 'Lean income' : 'Income'}</dt><dd className="num font-medium">{formatAmount(s.monthlyIncome, cur)}</dd></div>
                 <div className="flex gap-1.5"><dt className="text-muted">Expenses</dt><dd className="num font-medium">{formatAmount(s.monthlyExpenses, cur)} <span className="font-normal text-muted">({spentShare}%)</span></dd></div>
               </dl>
+              <p className="mt-3 text-sm"><Link href="/cash-flow" className="link">See when money comes and goes</Link></p>
             </div>
             <dl className="divide-y divide-line border-t border-line text-[0.9375rem] lg:border-t-0 lg:border-l lg:pl-10">
               <div className="flex items-baseline justify-between gap-4 py-3 lg:pt-0"><dt className="text-muted">Total debt</dt><dd className="num font-semibold">{formatAmount(s.totalDebt, cur)}</dd></div>
               <div className="flex items-baseline justify-between gap-4 py-3"><dt className="text-muted">Total savings</dt><dd className="num font-semibold">{formatAmount(s.totalSavings, cur)}</dd></div>
-              <div className="flex items-baseline justify-between gap-4 py-3 lg:pb-0">
+              <div className="flex items-baseline justify-between gap-4 py-3">
                 <dt className="text-muted">Emergency fund</dt>
                 <dd className="num font-semibold">{monthsCovered ? `${monthsCovered} months of essentials` : formatAmount(s.emergencyFund, cur)}</dd>
               </div>
+              {tiers.classified && tiers.committedMinor > 0 && (
+                <p className="pt-3 text-xs text-muted">It is for what you cannot live without (<span className="num">{formatAmount(tiers.survivalMinor, cur)}</span> a month), not for commitments of <span className="num">{formatAmount(tiers.committedMinor, cur)}</span>.</p>
+              )}
             </dl>
           </div>
         </section>
@@ -135,12 +144,33 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className="mt-2 grid gap-x-10 gap-y-3 lg:grid-cols-2">
             <ScenarioTable result={scenarios} currency={cur} />
             <div className="text-muted lg:pt-2">
-              <ScenarioNotes result={scenarios} currency={cur} />
+              <ScenarioNotes result={scenarios} currency={cur} basis={check.band.basis} monthsObserved={check.band.monthsObserved} />
               {scenarios.scenarios.some((one) => one.incomeMinor === null) && (
                 <p className="mt-2"><Link href="/profile" className="link">Add what you know about other months</Link></p>
               )}
             </div>
           </div>
+        </section>
+      )}
+
+      {bills.items.length > 0 && (
+        <section className="card mb-6 text-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+            <h2 className="text-lg font-semibold">Big bills ahead</h2>
+            <p className="text-muted">{bills.setAsideMinor > 0 ? <>Still to set aside this month: <span className="num font-semibold text-ink">{formatAmount(bills.setAsideMinor, cur)}</span></> : 'Set aside for this month'}</p>
+          </div>
+          <p className="mt-1 text-muted">Your expenses above count <span className="num">{formatAmount(bills.smoothedMonthlyMinor, cur)}</span> a month for these, spread out evenly. They really come all at once.</p>
+          <ul className="mt-2 divide-y divide-line">
+            {bills.items.map((bill) => (
+              <li key={bill.id} className="flex flex-wrap items-baseline justify-between gap-x-4 py-2">
+                <span>
+                  <span className="font-medium">{bill.label}</span> <span className="num text-muted">{formatAmount(bill.amountMinor, cur)} {humanise(bill.frequency).toLowerCase()} · {bill.dueDate ? `due ${formatDay(bill.dueDate)}` : 'due date not known'}{bill.reservedMinor > 0 && ` · ${formatAmount(bill.reservedMinor, cur)} set aside`}</span>
+                  {bill.dueDatePassed && <span className="block text-xs text-warn">The date recorded has passed, so it is taken as paid. Mark it paid or correct it on your <Link href="/profile" className="link">profile</Link>.</span>}
+                </span>
+                <span className="num font-semibold">{formatAmount(setAside(bill), cur)} a month</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -176,6 +206,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {plan ? (
             <>
               <p className="text-xs text-muted">Version {plan.version}, saved by {plan.savedBy === 'agent' ? 'your agent' : 'you'}</p>
+              {changedSince(plan, profile) && <p className="mt-1 text-xs text-warn">Your profile or goals have changed since it was saved.</p>}
               <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm">{plan.summary}</p>
               {debtPlan?.feasible && debtPlan.debtFreeMonth && (
                 <p className="mt-3 text-sm">Debt-free by <span className="font-semibold">{monthName(debtPlan.debtFreeMonth)}</span></p>
@@ -192,7 +223,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <section className="card">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Goals</h2>
-            <Link href="/goals" className="link text-sm">Manage</Link>
+            <span className="flex gap-4"><Link href="/share-out" className="link text-sm">Share out money</Link><Link href="/goals" className="link text-sm">Manage</Link></span>
           </div>
           {activeGoals.length === 0 ? (
             <Empty>No active goals.</Empty>

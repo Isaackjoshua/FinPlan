@@ -1,4 +1,4 @@
-import { add, CalcError, int } from './util';
+import { add, CalcError, int, MAX_TOTAL } from './util';
 
 export const SCENARIOS = ['lean', 'typical', 'good'] as const;
 export type ScenarioName = (typeof SCENARIOS)[number];
@@ -45,9 +45,6 @@ export interface ScenariosResult {
   leanMonthsOfEssentialsCovered: number | null;
 }
 
-/** Sums of many items may pass the limit for one amount; they only have to stay exact. */
-const MAX_TOTAL = Math.floor(Number.MAX_SAFE_INTEGER / 10);
-
 /** Checks a band: whole amounts, never lower in a better month. */
 export function checkBand(band: Band): Band {
   const lean = int('leanMinor', band.leanMinor, MAX_TOTAL);
@@ -78,7 +75,7 @@ export function calcScenarios(input: ScenariosInput): ScenariosResult {
   const buffer = int('bufferMinor', input.bufferMinor, MAX_TOTAL);
   const known = new Map(knownScenarios(input.income).map((s) => [s.scenario, s.amountMinor]));
 
-  const covered = (balance: number) => (balance < 0 ? Math.floor((buffer * 10) / -balance) / 10 : null);
+  const covered = (balance: number) => (balance < 0 ? Number((BigInt(buffer) * 10n) / BigInt(-balance)) / 10 : null);
   const lean = input.income.leanMinor;
 
   return {

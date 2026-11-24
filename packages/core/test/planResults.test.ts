@@ -31,7 +31,7 @@ const inputs = (over: object = {}) =>
 describe('computePlanResults', () => {
   it('works out where the money goes and when things are reached', () => {
     const r = computePlanResults(items, goals, inputs(), '2026-11');
-    expect(r.engineVersion).toBe('1.1.0');
+    expect(r.engineVersion).toBe('1.2.0');
     expect(r.monthly).toEqual({
       incomeMinor: 500_000,
       budgetedSpendingMinor: 170_000,

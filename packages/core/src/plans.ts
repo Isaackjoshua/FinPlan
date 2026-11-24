@@ -8,9 +8,10 @@ import {
   type Actor,
   type Ctx,
 } from './context';
+import { getIncomeHistory } from './checkins';
 import { openJson, sealJson } from './crypto';
 import { computePlanResults, type PlanResults } from './planResults';
-import { listGoals, listItems } from './profile';
+import { getProfile, listGoals, listItems } from './profile';
 import { planVersionInput, type PlanInputs } from './schemas';
 
 const { plans, planVersions, planEvents } = schema;
@@ -73,6 +74,10 @@ export async function savePlanVersion(
       await listGoals(ctx, userId, tx),
       inputs,
       now.toISOString().slice(0, 7),
+      {
+        history: await getIncomeHistory(ctx, userId, now.toISOString().slice(0, 10), tx),
+        profileRevision: (await getProfile(ctx, userId, tx))?.revision,
+      },
     );
     const stored: StoredPlan = { summary, inputs, results };
 
@@ -149,4 +154,10 @@ export async function getPlanVersion(ctx: Ctx, userId: string, version: number):
 
 export async function getCurrentPlan(ctx: Ctx, userId: string): Promise<PlanVersion | null> {
   return (await listPlanVersions(ctx, userId)).find((v) => v.isCurrent) ?? null;
+}
+
+/** Whether the profile or goals have changed since the plan was worked out; null for plans saved before this was kept. */
+export function changedSince(plan: Pick<PlanVersion, 'results'>, profile: { revision: number }): boolean | null {
+  const then = plan.results?.profileRevision;
+  return then === undefined ? null : then !== profile.revision;
 }

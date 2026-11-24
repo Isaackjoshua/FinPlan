@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, isNull, schema, sql, type Executor } from '@fin/db';
+import { addDays, addMonthsToDay } from '@fin/calc';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, not, schema, sql, type Executor } from '@fin/db';
 import { z } from 'zod';
 import {
   actorColumns,
@@ -9,11 +10,14 @@ import {
   type Ctx,
 } from './context';
 import { openJson, sealJson } from './crypto';
+import { INTERVAL } from './money';
 import {
+  amount,
   completeItem,
   goalData,
   goalStatus,
   itemData,
+  plannedDate,
   profileDetails,
   profileSetup,
   type GoalData,
@@ -24,12 +28,14 @@ import {
 } from './schemas';
 import type { CompletenessCode } from './warnings';
 
-const { profiles, profileItems, goals, profileRevisions } = schema;
+const { profiles, profileItems, goals, profileRevisions, allocations } = schema;
 
 /** Profile details as stored. Agents have no way to set the fields added here. */
 interface StoredDetails extends ProfileDetails {
   /** Completeness checks the user has said are right for them. */
   acknowledgedWarnings?: CompletenessCode[];
+  /** What the user could spend on a given day, from which a cash flow starts. */
+  cashOnHand?: { amountMinor: number; asOf: string; /** To tell whether money logged the same day is in it. */ recordedAt: string };
 }
 
 export interface Profile extends StoredDetails {
@@ -117,6 +123,8 @@ export interface WriteOptions {
   expectedRevision?: number;
   /** Keep a snapshot of the state before this write even though the writer is the user. */
   snapshot?: boolean;
+  /** Leave the revision as it is: the change affects no figure, so plans and other writers need not know. */
+  quiet?: boolean;
 }
 
 /**
@@ -145,6 +153,7 @@ async function mutate<T>(
         profile: await getProfile(ctx, userId, tx),
         items: await listItems(ctx, userId, undefined, tx),
         goals: await listGoals(ctx, userId, tx),
+        confirmedAllocations: await confirmedAllocationIds(tx, userId),
       };
       await tx.insert(profileRevisions).values({
         userId,
@@ -155,6 +164,7 @@ async function mutate<T>(
     }
 
     const result = await change(tx, key);
+    if (options.quiet) return { revision: row.revision, result };
     const revision = row.revision + 1;
     await tx.update(profiles).set({ revision }).where(eq(profiles.userId, userId));
     return { revision, result };
@@ -188,7 +198,7 @@ async function storedDetails(tx: Executor, key: Buffer, userId: string): Promise
  * rent), or takes that back. Only ever called on behalf of the signed-in user.
  */
 export async function setWarningAcknowledged(ctx: Ctx, userId: string, code: CompletenessCode, acknowledged: boolean) {
-  return mutate(ctx, userId, { type: 'user' }, {}, async (tx, key) => {
+  return mutate(ctx, userId, { type: 'user' }, { quiet: true }, async (tx, key) => {
     const current = await storedDetails(tx, key, userId);
     const others = (current.acknowledgedWarnings ?? []).filter((c) => c !== code);
     const next: StoredDetails = { ...current, acknowledgedWarnings: acknowledged ? [...others, code] : others };
@@ -198,15 +208,20 @@ export async function setWarningAcknowledged(ctx: Ctx, userId: string, code: Com
 
 /** The form an item is stored in: cleared and unused fields are left out, so fixed income looks as it always has. */
 function tidy(item: ItemData): ItemData {
-  if (item.kind !== 'income') return item;
-  const { variability, typicalMinor, highMinor, ...rest } = item;
-  if (variability === 'fixed') return rest;
-  return {
-    ...rest,
-    ...(variability && { variability }),
-    ...(typicalMinor != null && { typicalMinor }),
-    ...(highMinor != null && { highMinor }),
-  };
+  const kept = withoutEmpty(item);
+  if (kept.kind === 'expense' && kept.tier) return { ...kept, essential: kept.tier === 'survival' };
+  if (kept.kind !== 'income' || kept.variability !== 'fixed') return kept;
+  const { variability: _fixed, typicalMinor: _typical, highMinor: _high, ...rest } = kept;
+  return rest;
+}
+
+const withoutEmpty = <T extends object>(value: T) => Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== undefined)) as T;
+
+/** A writer that does not know about tiers can still say whether something is essential, and is taken at its word. */
+function retier(stored: ItemData, data: ItemData): ItemData {
+  if (stored.kind !== 'expense' || data.kind !== 'expense' || data.tier || !stored.tier) return data;
+  if (data.essential === (stored.tier === 'survival')) return data;
+  return { ...data, tier: data.essential ? 'survival' : 'discretionary' };
 }
 
 /**
@@ -235,8 +250,15 @@ async function writeItem(tx: Executor, key: Buffer, userId: string, data: ItemDa
     const stored = openJson<ItemData>(key, aad.item(userId, id), row.data);
     refuseBlindChange(stored, data);
     // Whatever the writer did not mention stays as it was.
-    const mentioned = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+    const mentioned = Object.fromEntries(Object.entries(retier(stored, data)).filter(([, value]) => value !== undefined));
     const next = tidy({ ...stored, ...mentioned } as ItemData);
+    // Days that suited the old frequency say nothing about a new one, unless the writer says so.
+    if (next.kind === 'income' && data.kind === 'income') {
+      if (next.frequency !== 'monthly' && data.arrival === undefined) delete next.arrival;
+      if (next.frequency === 'monthly' && data.nextPayDate === undefined) delete next.nextPayDate;
+    }
+    // A date given afresh is due on its own day.
+    if (next.kind === 'expense' && stored.kind === 'expense' && next.nextDueDate !== stored.nextDueDate) delete next.dueDay;
     completeItem.parse(next);
     await tx.update(profileItems).set({ data: sealJson(key, aad.item(userId, id), next) }).where(mine);
     return id;
@@ -336,8 +358,9 @@ export async function createGoal(
   input: z.input<typeof goalData>,
   options: WriteOptions = {},
 ) {
-  const data = goalData.parse(input);
+  const data = completeGoal(goalData.parse(input));
   return mutate(ctx, userId, actor, options, async (tx, key) => {
+    await needSavings(tx, userId, data.savingsItemId);
     const id = crypto.randomUUID();
     await tx.insert(goals).values({ id, userId, data: sealJson(key, aad.goal(userId, id), data) });
     return id;
@@ -357,7 +380,15 @@ export async function updateGoal(
     if (!row) throw new NotFoundError('Goal');
     const { status, ...fields } = changes;
     const current = openJson<GoalData>(key, aad.goal(userId, id), row.data);
-    const next = { ...unmentioned(current, goalData), ...goalData.parse({ ...current, ...fields }) };
+    const parsed = goalData.parse({ ...current, ...fields });
+    if (current.parts?.length && fields.parts === undefined && parsed.targetAmountMinor !== current.targetAmountMinor) {
+      throw new z.ZodError([{ code: 'custom', path: ['parts'], message: 'This goal is made up of parts, and its target is their total. Change the parts instead', input: undefined }]);
+    }
+    if (current.savingsItemId && fields.savingsItemId === undefined && parsed.currentAmountMinor !== current.currentAmountMinor) {
+      throw new z.ZodError([{ code: 'custom', path: ['currentAmountMinor'], message: 'This goal is linked to savings, and their balance is its progress. Change the balance instead', input: undefined }]);
+    }
+    if (parsed.savingsItemId !== current.savingsItemId) await needSavings(tx, userId, parsed.savingsItemId);
+    const next = { ...unmentioned(current, goalData), ...completeGoal(parsed) };
     await tx
       .update(goals)
       .set({
@@ -369,12 +400,128 @@ export async function updateGoal(
   });
 }
 
+/** The form a goal is stored in: cleared fields left out, and the target worked out from the parts. */
+function completeGoal(goal: GoalData): GoalData {
+  const kept = withoutEmpty(goal);
+  if (!kept.parts?.length) {
+    delete kept.parts;
+    return kept;
+  }
+  return { ...kept, targetAmountMinor: amount.parse(kept.parts.reduce((sum, part) => sum + part.amountMinor, 0)) };
+}
+
+async function isLive(tx: Executor, userId: string, savingsId: string): Promise<boolean> {
+  const rows = await tx
+    .select({ id: profileItems.id })
+    .from(profileItems)
+    .where(and(eq(profileItems.id, savingsId), eq(profileItems.userId, userId), eq(profileItems.kind, 'savings'), isNull(profileItems.archivedAt)));
+  return rows.length > 0;
+}
+
+async function needSavings(tx: Executor, userId: string, id: string | null | undefined) {
+  if (id && !(await isLive(tx, userId, id))) throw new NotFoundError('Savings item');
+}
+
+/** Records what the user can spend today. Only ever called on behalf of the signed-in user. */
+export async function setCashOnHand(ctx: Ctx, userId: string, cash: { amountMinor: number; asOf: string } | null) {
+  const cashOnHand = cash ? { amountMinor: amount.parse(cash.amountMinor), asOf: plannedDate.parse(cash.asOf), recordedAt: new Date().toISOString() } : undefined;
+  return mutate(ctx, userId, { type: 'user' }, { quiet: true }, async (tx, key) => {
+    const current = await storedDetails(tx, key, userId);
+    await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), { ...current, cashOnHand }) }).where(eq(profiles.userId, userId));
+  });
+}
+
+/** A balance that changed: a goal's own amount, what is set aside for an expense, or savings. Negative takes it back. */
+export type Move = { to: 'goal' | 'expense' | 'savings'; id: string; amountMinor: number };
+
+/**
+ * Records that the user moved money. Balances never go below zero. A snapshot is kept, so it
+ * can be undone like any other change, and `also` runs in the same step: both happen or neither.
+ * `also` gets exactly what changed. Money for a goal linked to savings changes those too, and
+ * taking it back has to undo that, whatever the goal is linked to by then.
+ */
+export async function applyMoves(
+  ctx: Ctx,
+  userId: string,
+  moves: Move[],
+  options: { /** Also add what goes to a goal to the savings it is linked to. */ throughLinks: boolean; expectedRevision?: number },
+  also: (tx: Executor, key: Buffer, made: Move[]) => Promise<void>,
+) {
+  return mutate(ctx, userId, { type: 'user' }, { snapshot: true, expectedRevision: options.expectedRevision }, async (tx, key) => {
+    const changeItem = async (id: string, change: (item: ItemData) => ItemData) => {
+      const where = and(eq(profileItems.id, id), eq(profileItems.userId, userId));
+      const [row] = await tx.select().from(profileItems).where(where);
+      if (!row) throw new NotFoundError('Item');
+      await tx.update(profileItems).set({ data: sealJson(key, aad.item(userId, id), tidy(change(openJson<ItemData>(key, aad.item(userId, id), row.data)))) }).where(where);
+    };
+    const plus = (a: number, b: number) => amount.parse(Math.max(0, a + b));
+    const made: Move[] = [];
+    const addToSavings = async (id: string, amountMinor: number) => {
+      await changeItem(id, (item) => (item.kind === 'savings' ? { ...item, balanceMinor: plus(item.balanceMinor, amountMinor) } : item));
+      made.push({ to: 'savings', id, amountMinor });
+    };
+    for (const move of moves) {
+      if (move.to === 'savings') {
+        await addToSavings(move.id, move.amountMinor);
+        continue;
+      }
+      if (move.to === 'expense') {
+        await changeItem(move.id, (item) => (item.kind === 'expense' ? { ...item, reservedMinor: plus(item.reservedMinor ?? 0, move.amountMinor) } : item));
+        made.push(move);
+        continue;
+      }
+      const where = and(eq(goals.id, move.id), eq(goals.userId, userId));
+      const [row] = await tx.select().from(goals).where(where);
+      if (!row) throw new NotFoundError('Goal');
+      const goal = openJson<GoalData>(key, aad.goal(userId, move.id), row.data);
+      await tx.update(goals).set({ data: sealJson(key, aad.goal(userId, move.id), { ...goal, currentAmountMinor: plus(goal.currentAmountMinor, move.amountMinor) }) }).where(where);
+      made.push(move);
+      // Savings since removed from the profile no longer hold the goal's money.
+      if (options.throughLinks && goal.savingsItemId && (await isLive(tx, userId, goal.savingsItemId))) await addToSavings(goal.savingsItemId, move.amountMinor);
+    }
+    await also(tx, key, made);
+  });
+}
+
+/** Records that a bill was paid from what was set aside for it: what is left over stays reserved, and the date moves on. */
+export async function markBillPaid(ctx: Ctx, userId: string, id: string) {
+  return mutate(ctx, userId, { type: 'user' }, { snapshot: true }, async (tx, key) => {
+    const where = and(eq(profileItems.id, id), eq(profileItems.userId, userId), isNull(profileItems.archivedAt));
+    const [row] = await tx.select().from(profileItems).where(where);
+    const item = row && openJson<ItemData>(key, aad.item(userId, id), row.data);
+    if (item?.kind !== 'expense') throw new NotFoundError('Expense');
+    const interval = INTERVAL[item.frequency];
+    const { nextDueDate } = item;
+    // Counted from the day it is really due on, or a bill due on the 31st would settle on the 28th.
+    const dueDay = item.dueDay ?? (nextDueDate ? Number(nextDueDate.slice(8)) : undefined);
+    let next = nextDueDate;
+    if (nextDueDate) next = 'days' in interval ? addDays(nextDueDate, interval.days) : addMonthsToDay(`${nextDueDate.slice(0, 8)}${String(dueDay).padStart(2, '0')}`, interval.months);
+    const paid: ItemData = {
+      ...item,
+      nextDueDate: next && plannedDate.parse(next),
+      ...('months' in interval && { dueDay }),
+      reservedMinor: Math.max(0, (item.reservedMinor ?? 0) - item.amountMinor) || null,
+    };
+    await tx.update(profileItems).set({ data: sealJson(key, aad.item(userId, id), tidy(paid)) }).where(where);
+  });
+}
+
+async function confirmedAllocationIds(tx: Executor, userId: string): Promise<string[]> {
+  const rows = await tx
+    .select({ id: allocations.id })
+    .from(allocations)
+    .where(and(eq(allocations.userId, userId), isNotNull(allocations.confirmedAt), isNull(allocations.voidedAt)));
+  return rows.map((row) => row.id);
+}
+
 // --- Undoing changes -----------------------------------------------------------
 
 interface Snapshot {
   profile: Profile | null;
   items: Item[];
   goals: Goal[];
+  /** Absent from snapshots taken before allocations existed, when there were none. */
+  confirmedAllocations?: string[];
 }
 
 export interface ProfileRevision {
@@ -415,8 +562,8 @@ export async function restoreProfileRevision(ctx: Ctx, userId: string, revision:
     if (snapshot.profile) {
       const { country: _country, currency: _currency, revision: _revision, ...details } = snapshot.profile;
       // Undoing an agent's change must not take back what the user themselves has said since.
-      const { acknowledgedWarnings } = await storedDetails(tx, key, userId);
-      await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), { ...details, acknowledgedWarnings }) }).where(eq(profiles.userId, userId));
+      const { acknowledgedWarnings, cashOnHand } = await storedDetails(tx, key, userId);
+      await tx.update(profiles).set({ data: sealJson(key, aad.profile(userId), { ...details, acknowledgedWarnings, cashOnHand }) }).where(eq(profiles.userId, userId));
     }
 
     const keptItems = new Set(snapshot.items.map((item) => item.id));
@@ -442,5 +589,14 @@ export async function restoreProfileRevision(ctx: Ctx, userId: string, revision:
     for (const { id } of allGoals) {
       if (!keptGoals.has(id)) await tx.update(goals).set({ status: 'abandoned' }).where(and(eq(goals.id, id), eq(goals.userId, userId)));
     }
+
+    // Money shared out counts only while the balances it changed are the ones in force.
+    const counted = snapshot.confirmedAllocations ?? [];
+    const confirmed = and(eq(allocations.userId, userId), isNotNull(allocations.confirmedAt));
+    if (counted.length > 0) await tx.update(allocations).set({ voidedAt: null }).where(and(confirmed, inArray(allocations.id, counted)));
+    await tx
+      .update(allocations)
+      .set({ voidedAt: sql`now()` })
+      .where(and(confirmed, isNull(allocations.voidedAt), counted.length > 0 ? not(inArray(allocations.id, counted)) : undefined));
   });
 }

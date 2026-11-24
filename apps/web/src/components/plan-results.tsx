@@ -35,7 +35,7 @@ export function PlanResultsView({
   names: Map<string, string>;
 }) {
   const money = (minor: number) => formatAmount(minor, currency);
-  const { monthly, debt, emergencyFund, goals, warnings, scenarios } = results;
+  const { monthly, debt, emergencyFund, goals, warnings, scenarios, spendingTiers } = results;
   const chosen = debt ? debt[strategy ?? 'avalanche'] : null;
   const other = debt ? debt[(strategy ?? 'avalanche') === 'avalanche' ? 'snowball' : 'avalanche'] : null;
 
@@ -73,7 +73,7 @@ export function PlanResultsView({
           )}
           <ScenarioTable result={scenarios} currency={currency} />
           <div className="mt-1 text-muted">
-            <ScenarioNotes result={scenarios} currency={currency} />
+            <ScenarioNotes result={scenarios} currency={currency} basis={scenarios.basis} monthsObserved={scenarios.monthsObserved} />
             {monthly.goalContributionsMinor > 0 && (
               <p className="mt-1">
                 A lean month can put <span className="num">{money(scenarios.scenarios[0]!.goalFundingMinor!)}</span> of the planned <span className="num">{money(monthly.goalContributionsMinor)}</span> towards goals.
@@ -124,6 +124,18 @@ export function PlanResultsView({
               ? `Reached in ${monthName(emergencyFund.targetReachedMonth)}.`
               : 'Nothing is being set aside for it in this plan.'}
         </p>
+        {spendingTiers && (
+          <p className="text-muted">
+            It covers what you cannot live without, <span className="num">{money(spendingTiers.survivalMinor)}</span> a month. It does not cover commitments of <span className="num">{money(spendingTiers.committedMinor)}</span> or other spending of <span className="num">{money(spendingTiers.discretionaryMinor)}</span>.
+          </p>
+        )}
+        {scenarios?.leanRun && scenarios.leanRun.amountMinor > 0 && (
+          <p className="text-muted">
+            {scenarios.leanRun.basis === 'measured'
+              ? <>In the {scenarios.leanRun.months} months your check-ins cover, income fell behind essentials by up to <span className="num">{money(scenarios.leanRun.amountMinor)}</span>.</>
+              : <>Paying for essentials through {scenarios.leanRun.months} lean months in a row would take <span className="num">{money(scenarios.leanRun.amountMinor)}</span>.</>}
+          </p>
+        )}
       </div>
 
       {goals.length > 0 && (

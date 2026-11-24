@@ -1,5 +1,5 @@
 import { CalcError, SCENARIOS } from '@fin/calc';
-import { ConflictError, DEBT_KINDS, EXPENSE_CATEGORIES, FREQUENCIES, INCOME_VARIABILITY, NotFoundError, type PlanVersion } from '@fin/core';
+import { changedSince, ConflictError, DEBT_KINDS, EXPENSE_CATEGORIES, EXPENSE_TIERS, FREQUENCIES, INCOME_BASES, INCOME_VARIABILITY, NotFoundError, type PlanVersion } from '@fin/core';
 import { z, ZodError } from 'zod';
 
 /**
@@ -154,12 +154,32 @@ export const scenariosResult = z.strictObject({
   lean_months_covered: orNull(z.number()).describe('Lean months the emergency fund makes up for; null when a lean month has no shortfall.'),
   lean_months_of_essentials_covered: orNull(z.number()),
 });
-export const incomeBasis = z.enum(['declared']).describe('declared: what the user said they expect, not measured.');
+/** Larger than one amount may be: for totals of many. */
+export const totalMinor = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+/** What `income_band` and `scenarios` have said since they were introduced. Figures with any other basis go elsewhere. */
+export const declaredBasis = z.enum(['declared']).describe('declared: what the user said they expect, not measured.');
+export const incomeBasis = z
+  .enum(INCOME_BASES)
+  .describe('declared: what the user said they expect. provisional: the same, with gaps filled from 3 to 5 observed months. measured: 6 or more observed months alone.');
+export const tier = z.enum(EXPENSE_TIERS).describe('survival: cannot live without it. committed: owed or awkward to stop, such as a subscription. discretionary: the rest. Only survival spending counts as essential and sizes an emergency fund.');
+export const band = z.strictObject({ lean_minor: minor, typical_minor: orNull(minor), good_minor: orNull(minor) });
 export const variability = z.enum(INCOME_VARIABILITY);
 
 export const variance = z.strictObject({ period_days: z.number().int(), spending: z.array(line.extend({ category: z.string() })), income: line, debt_payments: line });
 
 // A saved plan.
+export const spendingTiers = z.strictObject({ survival_minor: minor, committed_minor: minor, discretionary_minor: minor, classified: z.boolean().describe('False until the user has given any expense a tier; survival is then whatever is marked essential.') });
+
+// How a goal is made up, paid for and whether it can be met.
+export const goalExtra = z.array(z.enum(['funding', 'feasibility', 'parts'])).max(3).optional().describe('`funding` adds its place in line and cap, `feasibility` whether it can be met by its date, `parts` what it is made up of.');
+export const goalParts = z.array(z.strictObject({ amount_minor: minor, done: z.boolean(), user_text: z.strictObject({ label: z.string() }) }));
+export const feasibility = z.strictObject({
+  months_left: orNull(z.number().int()),
+  required_monthly_minor: orNull(minor),
+  scenarios: z.array(z.strictObject({ scenario: scenarioName, enough: orNull(z.boolean()) })),
+  verdict: z.enum(['reached', 'no_date', 'date_passed', 'reachable', 'some_months_only', 'unreachable']).describe('Counts this goal alone. unreachable: no kind of month known leaves over enough.'),
+});
+
 export const planInputs = z.strictObject({
   budget: z.array(z.strictObject({ category, amount_minor: minor })),
   debt_strategy: z.enum(['snowball', 'avalanche']).optional(),
@@ -183,12 +203,29 @@ export const planResults = z.strictObject({
   goals: z.array(z.strictObject({ goal_id: z.string(), months_to_target: orNull(z.number().int()), target_reached_month: orNull(z.string()) })),
   warnings: z.array(warning),
   scenarios: scenariosResult
-    .extend({ basis: incomeBasis, omitted_spending_minor: minor.describe('Spending in the profile that the plan leaves out. The scenarios count it.') })
+    .extend({ basis: declaredBasis, omitted_spending_minor: minor.describe('Spending in the profile that the plan leaves out. The scenarios count it.') })
+    .optional()
+    .describe('Only when asked for, income varies and the figures are as declared. `planning` has them whatever they rest on.'),
+  planning: scenariosResult
+    .extend({
+      basis: incomeBasis,
+      months_observed: orNull(z.number().int()),
+      omitted_spending_minor: minor.describe('Spending in the profile that the plan leaves out. The scenarios count it.'),
+      lean_run: z
+        .strictObject({ basis: z.enum(['measured', 'assumed']), months: z.number().int(), amount_minor: totalMinor })
+        .nullable()
+        .describe('What it takes to keep paying for essentials through lean months. measured: the deepest hole the observed months dug. assumed: that many lean months in a row. Null for plans saved before this was worked out.'),
+    })
     .optional()
     .describe('Only when asked for and income varies; `monthly` then describes a lean month.'),
+  spending_tiers: spendingTiers.optional(),
 });
 /** Extra parts of a plan's results, returned only to callers that ask. */
-export const include = z.array(z.enum(['scenarios'])).max(1).optional().describe('`scenarios` adds lean, typical and good months when income varies.');
+export const include = z
+  .array(z.enum(['planning', 'scenarios', 'spending_tiers', 'status']))
+  .max(4)
+  .optional()
+  .describe('`planning` adds lean, typical and good months when income varies, and what they rest on (`scenarios` is an older form of it). `spending_tiers` adds what the emergency fund does and does not cover. `status` says whether the profile has changed since the plan was saved.');
 type Include = z.infer<typeof include>;
 export const plan = z.strictObject({
   version: z.number().int(),
@@ -198,6 +235,7 @@ export const plan = z.strictObject({
   user_text: z.strictObject({ summary: z.string() }),
   inputs: planInputs,
   results: planResults.nullable(),
+  profile_changed_since: z.boolean().nullable().optional().describe('Null for plans saved before this was kept.'),
 });
 
 type PlanResultsOut = z.infer<typeof planResults>;
@@ -206,7 +244,11 @@ type PlanResultsOut = z.infer<typeof planResults>;
 export function resultsOut(results: PlanVersion['results'], detail: 'summary' | 'full', extra: Include): PlanResultsOut | null {
   if (!results) return null;
   const out = toSnake<PlanResultsOut>(results);
-  if (!extra?.includes('scenarios')) delete out.scenarios;
+  const scenarios = results.scenarios && toSnake(results.scenarios);
+  delete out.scenarios;
+  if (scenarios && extra?.includes('scenarios') && scenarios.basis === 'declared') out.scenarios = scenarios;
+  if (scenarios && extra?.includes('planning')) out.planning = { ...scenarios, months_observed: scenarios.months_observed ?? null, lean_run: scenarios.lean_run ?? null };
+  if (!extra?.includes('spending_tiers')) delete out.spending_tiers;
   if (detail === 'summary') {
     delete out.budget;
     for (const strategy of [out.debt?.snowball, out.debt?.avalanche]) {
@@ -219,7 +261,7 @@ export function resultsOut(results: PlanVersion['results'], detail: 'summary' | 
   return out;
 }
 
-export function planOut(version: PlanVersion, detail: 'summary' | 'full', extra: Include): z.infer<typeof plan> {
+export function planOut(version: PlanVersion, detail: 'summary' | 'full', extra: Include, profile: { revision: number }): z.infer<typeof plan> {
   return {
     version: version.version,
     saved_at: version.savedAt.toISOString(),
@@ -228,6 +270,7 @@ export function planOut(version: PlanVersion, detail: 'summary' | 'full', extra:
     user_text: { summary: version.summary },
     inputs: toSnake(version.inputs),
     results: resultsOut(version.results, detail, extra),
+    ...(extra?.includes('status') && { profile_changed_since: changedSince(version, profile) }),
   };
 }
 

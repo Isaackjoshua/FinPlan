@@ -1,6 +1,10 @@
 import {
+  ALLOCATION_GROUPS,
+  cashFlow,
   checkInVariance,
-  checkProfile,
+  effectiveGoals,
+  expensesOf,
+  expenseTiers,
   getCurrentPlan,
   getLesson,
   getPlanVersion,
@@ -8,23 +12,43 @@ import {
   getProgress,
   GOAL_KINDS,
   GOAL_STATUSES,
+  goalFeasibility,
   incomeBand,
+  leftOver,
+  listAllocations,
   listCheckIns,
   listGoals,
+  listIncome,
   listItems,
   listLessons,
   listPlanVersions,
+  loadProfileCheck,
+  lumpyMonths,
+  minorDigits,
+  obligations,
+  previewAllocation,
+  profileScenarios,
+  SCOPES,
   TAGS,
+  tierOf,
+  toMonthly,
   TOPICS,
+  type AllocationPlan,
   type Ctx,
+  type Goal,
   type Profile,
 } from '@fin/core';
 import { z } from 'zod';
 import {
+  band,
   bps,
   category,
   debtKind,
+  declaredBasis,
+  feasibility,
   frequency,
+  goalExtra,
+  goalParts,
   include,
   incomeBasis,
   isoDate,
@@ -34,8 +58,12 @@ import {
   plan,
   planOut,
   POSITIONING,
+  scenarioName,
   scenariosResult,
   signedMinor,
+  spendingTiers,
+  tier,
+  totalMinor,
   toSnake,
   ToolError,
   USER_TEXT_NOTE,
@@ -55,6 +83,12 @@ export async function needProfile(ctx: Ctx, userId: string): Promise<Profile> {
 }
 
 const label = z.strictObject({ label: z.string() });
+export const today = () => new Date().toISOString().slice(0, 10);
+
+const obligationsOut = ({ items, ...totals }: ReturnType<typeof obligations>) => ({
+  ...toSnake(totals),
+  bills: items.map(({ label: text, ...bill }) => ({ ...toSnake(bill), user_text: { label: text } })),
+});
 const detail = z.enum(['summary', 'full']).default('summary').describe('`summary` gives totals; `full` adds the budget breakdown and the month-by-month debt schedule.');
 
 const getProfileTool = tool({
@@ -65,11 +99,11 @@ const getProfileTool = tool({
   description: `Read the user's financial profile. By default returns only monthly totals and warnings; ask for line items with \`sections\`, and request only what you need. Read this before proposing changes, and pass the returned \`revision\` to update_profile. ${MINOR_NOTE} ${USER_TEXT_NOTE}`,
   input: z.strictObject({
     sections: z
-      .array(z.enum(['summary', 'income', 'expenses', 'debts', 'savings', 'income_band', 'completeness']))
-      .max(7)
+      .array(z.enum(['summary', 'income', 'expenses', 'debts', 'savings', 'income_band', 'completeness', 'income_plan', 'expense_details', 'obligations']))
+      .max(10)
       .default(['summary'])
       .describe(
-        'Which parts to return. `summary` is totals only; `income`, `expenses`, `debts` and `savings` are the individual line items. `income_band` says whether income varies and what a lean, typical and good month work out to. `completeness` says whether the profile is complete enough to rely on.',
+        'Which parts to return. `summary` is totals only; `income`, `expenses`, `debts` and `savings` are the individual line items. `income_plan` says whether income varies, what a lean, typical and good month work out to, and what those figures rest on, check-ins included. `income_band` is the same from what the user declared alone. `completeness` says whether the profile is complete enough to rely on. `expense_details` gives each expense its tier, its monthly equivalent and its due date. `obligations` lists bills that come less often than monthly, which monthly totals spread out, and what to set aside for them.',
       ),
   }),
   output: z.strictObject({
@@ -100,11 +134,25 @@ const getProfileTool = tool({
     income_band: z
       .strictObject({
         varies: z.boolean().describe('When true, monthly income and surplus in `summary` describe a lean month.'),
-        basis: incomeBasis,
+        basis: declaredBasis,
         lean_minor: minor,
         typical_minor: orNull(minor),
         good_minor: orNull(minor),
         sources: z.array(z.strictObject({ id: z.string(), variability, lean_minor: minor, typical_minor: orNull(minor), good_minor: orNull(minor) })).describe('Monthly, per income item.'),
+        results: scenariosResult.nullable().describe('Null when income does not vary.'),
+      })
+      .optional(),
+    income_plan: z
+      .strictObject({
+        varies: z.boolean().describe('When true, monthly income and surplus in `summary` describe a lean month.'),
+        basis: incomeBasis,
+        lean_minor: totalMinor,
+        typical_minor: orNull(totalMinor),
+        good_minor: orNull(totalMinor),
+        declared: band.describe('What the profile says, whatever was observed.'),
+        months_observed: z.number().int(),
+        observed: z.array(z.strictObject({ month: z.string(), total_minor: totalMinor })).describe('Months whose income is known from check-ins that cover each day once.'),
+        excluded: z.array(z.strictObject({ month: z.string(), reason: z.enum(['gap', 'overlap', 'crosses_month_end', 'income_not_stated']) })).describe('Finished months with check-ins that could not be counted.'),
         results: scenariosResult.nullable().describe('Null when income does not vary.'),
       })
       .optional(),
@@ -114,16 +162,55 @@ const getProfileTool = tool({
         acknowledged: z.array(z.string()).describe('Checks the user has said are right for them.'),
       })
       .optional(),
+    expense_details: z
+      .strictObject({
+        tiers: spendingTiers.describe('Monthly. An emergency fund is sized on survival spending only.'),
+        lines: z.array(
+          z.strictObject({
+            id: z.string(),
+            tier,
+            amount_minor: minor,
+            frequency,
+            monthly_minor: minor,
+            smoothed: z.boolean().describe('True when the monthly figure spreads out a bill that comes less often.'),
+            next_due_date: orNull(z.string()),
+            reserved_minor: minor,
+          }),
+        ),
+      })
+      .optional(),
+    obligations: z
+      .strictObject({
+        set_aside_minor: minor.describe('Still to set aside this month in all.'),
+        steady_monthly_minor: minor,
+        smoothed_monthly_minor: minor.describe('How much of the monthly expenses is these bills spread out evenly.'),
+        bills: z.array(
+          z.strictObject({
+            id: z.string(),
+            amount_minor: minor,
+            frequency,
+            reserved_minor: minor.describe('Towards the next bill, once bills whose date has passed are taken as paid from it.'),
+            set_aside_minor: minor.describe('Still to set aside this month.'),
+            remaining_minor: minor,
+            due_date: orNull(z.string()).describe('Null when not known.'),
+            due_date_passed: z.boolean().describe('The recorded date has passed; the bill is taken as paid and these figures are for the next one. Ask the user.'),
+            months_left: orNull(z.number().int()),
+            steady_monthly_minor: minor,
+            catch_up_monthly_minor: orNull(minor).describe('What to set aside monthly to have it all in time. Null without a date.'),
+            user_text: label,
+          }),
+        ),
+      })
+      .optional(),
   }),
   async run({ sections }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
-    const items = await listItems(ctx, auth.userId);
+    const { items, history, given, band: income, summary: totals, warnings, scenarios, surplusReliable, acknowledged } = await loadProfileCheck(ctx, auth.userId, profile, today());
+    const declaredScenarios = profileScenarios({ ...income, ...income.declared }, totals);
     const wants = (section: (typeof sections)[number]) => sections.includes(section);
     // Line items leave their label out of the main object and carry it in `user_text`.
     const lines = (kind: string) =>
       items.filter((item) => item.kind === kind).map(({ kind: _kind, label: text, ...rest }) => ({ ...toSnake(rest), user_text: { label: text } }));
-    const { summary: totals, warnings, scenarios, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
-    const band = incomeBand(items);
     return {
       result: {
         currency: profile.currency,
@@ -152,24 +239,54 @@ const getProfileTool = tool({
         ...(wants('savings') && { savings: lines('savings') }),
         ...(wants('income_band') && {
           income_band: {
-            varies: band.varies,
-            basis: band.basis,
-            lean_minor: band.leanMinor,
-            typical_minor: band.typicalMinor,
-            good_minor: band.goodMinor,
+            varies: income.varies,
+            basis: 'declared' as const,
+            ...toSnake(income.declared),
             sources: items.flatMap((item) => {
               if (item.kind !== 'income') return [];
               const one = incomeBand([item]);
               return [{ id: item.id, variability: item.variability ?? 'fixed', lean_minor: one.leanMinor, typical_minor: one.typicalMinor, good_minor: one.goodMinor }];
             }),
+            results: declaredScenarios && toSnake(declaredScenarios),
+          },
+        }),
+        ...(wants('income_plan') && {
+          income_plan: {
+            varies: income.varies,
+            basis: income.basis,
+            lean_minor: income.leanMinor,
+            typical_minor: income.typicalMinor,
+            good_minor: income.goodMinor,
+            declared: toSnake(income.declared),
+            months_observed: income.monthsObserved,
+            observed: toSnake(history.observed),
+            excluded: history.excluded,
             results: scenarios && toSnake(scenarios),
           },
         }),
+        ...(wants('expense_details') && {
+          expense_details: {
+            tiers: toSnake(expenseTiers(items)),
+            lines: expensesOf(items).map((e) => ({
+              id: e.id,
+              tier: tierOf(e),
+              amount_minor: e.amountMinor,
+              frequency: e.frequency,
+              monthly_minor: toMonthly(e.amountMinor, e.frequency),
+              smoothed: lumpyMonths(e.frequency) !== null,
+              next_due_date: e.nextDueDate ?? null,
+              reserved_minor: e.reservedMinor ?? 0,
+            })),
+          },
+        }),
+        ...(wants('obligations') && { obligations: obligationsOut(obligations(items, today(), given)) }),
         ...(wants('completeness') && { completeness: { surplus_reliable: surplusReliable, acknowledged } }),
       },
     };
   },
 });
+
+export const partsOut = (goal: Pick<Goal, 'parts'>) => (goal.parts ?? []).map((part) => ({ amount_minor: part.amountMinor, done: part.done, user_text: { label: part.label } }));
 
 const listGoalsTool = tool({
   name: 'list_goals',
@@ -177,7 +294,7 @@ const listGoalsTool = tool({
   kind: 'read',
   scope: 'finance:read',
   description: `List the user's financial goals with their targets and progress. ${MINOR_NOTE} ${USER_TEXT_NOTE}`,
-  input: z.strictObject({ status: z.enum(GOAL_STATUSES).optional().describe('Only goals with this status. Omit for all.') }),
+  input: z.strictObject({ status: z.enum(GOAL_STATUSES).optional().describe('Only goals with this status. Omit for all.'), include: goalExtra }),
   output: z.strictObject({
     currency: z.string(),
     goals: z.array(
@@ -190,12 +307,17 @@ const listGoalsTool = tool({
         current_amount_minor: minor,
         target_date: orNull(z.string()),
         user_text: z.strictObject({ title: z.string() }),
+        funding: z.strictObject({ funding_order: orNull(z.number().int()), monthly_cap_minor: orNull(minor), savings_item_id: orNull(z.string()) }).optional(),
+        feasibility: feasibility.optional(),
+        parts: goalParts.optional(),
       }),
     ),
   }),
-  async run({ status }, auth, { ctx }) {
+  async run({ status, include: extra }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
-    const goals = (await listGoals(ctx, auth.userId)).filter((goal) => !status || goal.status === status);
+    const { goals: all, items, summary, scenarios } = await loadProfileCheck(ctx, auth.userId, profile, today());
+    const goals = effectiveGoals(all, items).filter((goal) => !status || goal.status === status);
+    const left = leftOver(summary, scenarios);
     return {
       result: {
         currency: profile.currency,
@@ -208,6 +330,9 @@ const listGoalsTool = tool({
           current_amount_minor: goal.currentAmountMinor,
           target_date: goal.targetDate ?? null,
           user_text: { title: goal.title },
+          ...(extra?.includes('funding') && { funding: { funding_order: goal.fundingOrder ?? null, monthly_cap_minor: goal.monthlyCapMinor ?? null, savings_item_id: goal.savingsItemId ?? null } }),
+          ...(extra?.includes('feasibility') && { feasibility: toSnake(goalFeasibility(goal, left, today())) }),
+          ...(extra?.includes('parts') && { parts: partsOut(goal) }),
         })),
       },
     };
@@ -227,7 +352,7 @@ const getCurrentPlanTool = tool({
   async run({ detail: level, include: extra }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
     const current = await getCurrentPlan(ctx, auth.userId);
-    return { result: { currency: profile.currency, plan: current ? planOut(current, level, extra) : null } };
+    return { result: { currency: profile.currency, plan: current ? planOut(current, level, extra, profile) : null } };
   },
 });
 
@@ -241,7 +366,7 @@ const getPlanVersionTool = tool({
   output: planOutput,
   async run({ version, detail: level, include: extra }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
-    return { result: { currency: profile.currency, plan: planOut(await getPlanVersion(ctx, auth.userId, version), level, extra) } };
+    return { result: { currency: profile.currency, plan: planOut(await getPlanVersion(ctx, auth.userId, version), level, extra, profile) } };
   },
 });
 
@@ -374,6 +499,151 @@ const getProgressTool = tool({
   },
 });
 
+// --- Money arriving and being shared out -------------------------------------------
+
+const listIncomeTool = tool({
+  name: 'list_income',
+  title: 'List income received',
+  kind: 'read',
+  scope: 'finance:read',
+  description: `List money the user has recorded as arriving, newest first, with the day it came. This is separate from the income they expect, which is in get_profile. ${MINOR_NOTE} ${USER_TEXT_NOTE}`,
+  input: z.strictObject({ since: isoDate.optional().describe('Only money that came on or after this date.'), limit: z.number().int().min(1).max(100).default(30) }),
+  output: z.strictObject({
+    currency: z.string(),
+    total_minor: totalMinor.describe('The total of what is listed.'),
+    income: z.array(z.strictObject({ id: z.string(), received_on: z.string(), amount_minor: minor, item_id: orNull(z.string()), logged_by: z.enum(['user', 'agent']), user_text: z.strictObject({ source: z.string().optional() }) })),
+  }),
+  async run({ since, limit }, auth, { ctx }) {
+    const profile = await needProfile(ctx, auth.userId);
+    const all = await listIncome(ctx, auth.userId, { sinceMonth: since?.slice(0, 7) });
+    const page = all.filter((r) => !since || r.receivedOn >= since).slice(0, limit);
+    return {
+      result: {
+        currency: profile.currency,
+        total_minor: page.reduce((sum, r) => sum + r.amountMinor, 0),
+        income: page.map((r) => ({ id: r.id, received_on: r.receivedOn, amount_minor: r.amountMinor, item_id: r.itemId ?? null, logged_by: r.loggedBy, user_text: r.source ? { source: r.source } : {} })),
+      },
+    };
+  },
+});
+
+const getCashFlowTool = tool({
+  name: 'get_cash_flow',
+  title: 'Get cash flow',
+  kind: 'read',
+  scope: 'finance:read',
+  description: `Run the user's recorded income, bills and debt payments forward day by day from what they can spend today, to see whether money runs out before income arrives. Income that comes between two days is taken to come on the last. Anything without a recorded date is listed in \`undated\` and left out, and the result is then partial: say so, and do not guess dates. ${MINOR_NOTE} ${POSITIONING}`,
+  input: z.strictObject({
+    opening_balance_minor: minor.optional().describe('What the user can spend on the first day. Omit to use what they recorded in FinPlan.'),
+    days: z.number().int().min(1).max(366).default(60),
+    scenario: scenarioName.default('lean').describe('Which kind of month to assume for income that varies.'),
+  }),
+  output: z.strictObject({
+    currency: z.string(),
+    scenario: scenarioName,
+    start_date: z.string(),
+    end_date: z.string(),
+    opening_minor: minor,
+    opening_as_of: orNull(z.string()).describe('When the opening balance was recorded, if it was not given.'),
+    end_minor: signedMinor,
+    money_in_minor: totalMinor,
+    money_out_minor: totalMinor,
+    lowest: z.strictObject({ date: z.string(), balance_minor: signedMinor }),
+    first_short_date: orNull(z.string()).describe('The first day there is not enough.'),
+    partial: z.boolean().describe('True when anything below was left out or assumed.'),
+    assumed_paid: z.array(z.strictObject({ id: z.string(), date: z.string() })).describe('Big bills whose date has passed without being marked paid. They are taken as paid; ask the user.'),
+    unmatched_receipts_minor: totalMinor.describe('Money received this month that is not linked to one of several incomes, so that income may be counted twice. Ask the user which it was.'),
+    undated: z.array(z.strictObject({ id: z.string(), kind: z.enum(['income', 'expense', 'debt']) })),
+    points: z.array(z.strictObject({ date: z.string(), change_minor: signedMinor, balance_minor: signedMinor, ids: z.array(z.string()) })),
+  }),
+  async run({ opening_balance_minor, days, scenario }, auth, { ctx }) {
+    const profile = await needProfile(ctx, auth.userId);
+    const cash = opening_balance_minor === undefined ? profile.cashOnHand : undefined;
+    if (opening_balance_minor === undefined && !cash) throw new ToolError('Ask the user how much they can spend today and pass it as `opening_balance_minor`: none is recorded.');
+    const day = today();
+    const [{ items, band: income }, receipts] = await Promise.all([loadProfileCheck(ctx, auth.userId, profile, day), listIncome(ctx, auth.userId, { sinceMonth: day.slice(0, 7) })]);
+    const openingAsOf = cash ? { date: cash.asOf, recordedAt: cash.recordedAt } : { date: day, recordedAt: new Date().toISOString() };
+    const flow = cashFlow(items, { openingMinor: opening_balance_minor ?? cash!.amountMinor, openingAsOf, startDate: day, days, scenario, band: income, receipts });
+    return { result: { ...toSnake(flow), currency: profile.currency, opening_as_of: cash?.asOf ?? null } };
+  },
+});
+
+const allocationLines = z.array(
+  z.strictObject({
+    group: z.enum(ALLOCATION_GROUPS).describe('In order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals, the rest of the spending.'),
+    id: z.string().describe('The expense, debt or goal.'),
+    wanted_minor: totalMinor,
+    allocated_minor: minor,
+    unmet_minor: totalMinor,
+  }),
+);
+export const allocationPlan = { available_minor: minor, allocated_minor: minor, left_minor: minor, lines: allocationLines };
+export const allocationOut = (plan: AllocationPlan) => toSnake(plan);
+
+const previewAllocationTool = tool({
+  name: 'preview_allocation',
+  title: 'Preview sharing out money',
+  kind: 'read',
+  scope: 'finance:read',
+  description: `Work out how an amount of money the user has now would be shared out, in a fixed order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals in line, then the rest. Each gets what it still needs this month before the next gets anything. Stores nothing. ${MINOR_NOTE} ${POSITIONING}`,
+  input: z.strictObject({ available_minor: minor.describe('The money to share out.') }),
+  output: z.strictObject({ currency: z.string(), ...allocationPlan }),
+  async run({ available_minor }, auth, { ctx }) {
+    const profile = await needProfile(ctx, auth.userId);
+    return { result: { currency: profile.currency, ...allocationOut(await previewAllocation(ctx, auth.userId, available_minor, today())) } };
+  },
+});
+
+const listAllocationsTool = tool({
+  name: 'list_allocations',
+  title: 'List shared-out money',
+  kind: 'read',
+  scope: 'finance:read',
+  description: `List how money has been shared out, newest first. A proposed one has changed nothing yet: only the user can confirm it, on the FinPlan website, once the money has moved. ${MINOR_NOTE}`,
+  input: z.strictObject({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional().describe('Only this month, as 2026-11.'), limit: z.number().int().min(1).max(50).default(10) }),
+  output: z.strictObject({
+    currency: z.string(),
+    allocations: z.array(z.strictObject({ id: z.string(), month: z.string(), status: z.enum(['proposed', 'confirmed', 'discarded']), made_by: z.enum(['user', 'agent']), made_at: z.string(), ...allocationPlan })),
+  }),
+  async run({ month, limit }, auth, { ctx }) {
+    const profile = await needProfile(ctx, auth.userId);
+    return { result: { currency: profile.currency, allocations: (await listAllocations(ctx, auth.userId, { month, limit })).map((a) => allocationOut(a)) as never } };
+  },
+});
+
+// --- About the connection ----------------------------------------------------------
+
+const getCapabilitiesTool = tool({
+  name: 'get_capabilities',
+  title: 'Get capabilities',
+  kind: 'catalogue',
+  scope: null,
+  description: "What this connection may do, and how the user's currency is written as whole minor units. Call this before preparing a change, rather than finding out that it is not allowed.",
+  input: z.strictObject({}),
+  output: z.strictObject({
+    can_read: z.boolean(),
+    can_write: z.boolean(),
+    tools_needing_permission: z.array(z.string()).describe('Tools this connection lacks permission for. Calling one asks the user to grant it.'),
+    currency: z
+      .strictObject({ code: z.string(), decimals: z.number().int(), one_thousand_minor: minor.describe('How an amount of one thousand is passed to and returned by every tool.') })
+      .nullable()
+      .describe('Null without permission to read, or before the user has set FinPlan up.'),
+  }),
+  async run(_args, auth, { ctx, scopeOf }) {
+    const can = (scope: (typeof SCOPES)[number]) => auth.scopes.includes(scope);
+    const profile = can('finance:read') ? await getProfile(ctx, auth.userId) : null;
+    const decimals = profile && minorDigits(profile.currency);
+    return {
+      result: {
+        can_read: can('finance:read'),
+        can_write: can('finance:write'),
+        tools_needing_permission: Object.entries(scopeOf()).flatMap(([name, scope]) => (scope && !can(scope) ? [name] : [])),
+        currency: profile && decimals !== null ? { code: profile.currency, decimals, one_thousand_minor: 1000 * 10 ** decimals } : null,
+      },
+    };
+  },
+});
+
 // --- Lesson catalogue: our own content, the same for everyone -----------------------
 
 const lessonCard = {
@@ -441,6 +711,11 @@ export const readTools = [
   getPlanVersionTool,
   listCheckInsTool,
   getProgressTool,
+  listIncomeTool,
+  getCashFlowTool,
+  previewAllocationTool,
+  listAllocationsTool,
+  getCapabilitiesTool,
   listLessonsTool,
   getLessonTool,
 ];

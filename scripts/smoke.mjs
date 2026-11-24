@@ -70,8 +70,8 @@ check('onboarding done', (await get('/dashboard')).url === '/dashboard');
 const add = (kind, fields) => submit('/profile', (f) => f.hidden.kind === kind && !f.hidden.id, fields);
 check('bad amount rejected', (await add('income', { label: 'Salary', amount: 'lots', frequency: 'monthly' })).includes('error='));
 await add('income', { label: 'Salary', amount: '120,000', frequency: 'monthly' });
-await add('expense', { label: 'Rent', amount: '45000', frequency: 'monthly', category: 'housing', essential: 'on' });
-await add('expense', { label: 'Food', amount: '5000', frequency: 'weekly', category: 'food', essential: 'on' });
+await add('expense', { label: 'Rent', amount: '45000', frequency: 'monthly', category: 'housing', tier: 'survival' });
+await add('expense', { label: 'Food', amount: '5000', frequency: 'weekly', category: 'food', tier: 'survival' });
 await add('debt', { label: 'Mobile loan', debtKind: 'mobile_loan', balance: '30000', rate: '36', minimum: '3000' });
 await add('savings', { label: 'Buffer', balance: '66666.67', rate: '8.5', emergency: 'on' });
 let dash = (await get('/dashboard')).html;
@@ -258,6 +258,42 @@ check('dashboard shows the lean month (60,000 − 66,666.67 − 3,000)', dash.in
 check('dashboard guesses nothing about other months', dash.includes('Typical month Not known') && dash.includes('Good month Not known'));
 await plan('A plan for lean months');
 check('plan shows what a lean month works out to', txt((await get('/plan')).html).includes('When your income varies'));
+
+// Bills that come less often, when money comes and goes, and sharing it out.
+await add('expense', { label: 'School fees', amount: '90000', frequency: 'every_six_months', category: 'education', tier: 'committed', nextDueDate: '2099-01-10', reserved: '15000' });
+check('profile shows the bill and what it is spread out to', txt((await get('/profile')).html).includes('KES 90,000.00 every six months, about KES 15,000.00 a month'));
+dash = txt((await get('/dashboard')).html);
+check('dashboard lists the bill with its date', dash.includes('Big bills ahead') && dash.includes('due 10 Jan 2099') && dash.includes('KES 15,000.00 set aside'));
+check('dashboard says what the emergency fund is not for', dash.includes('not for commitments of KES 15,000.00'));
+check('the plan is said to be out of date', dash.includes('have changed since it was saved'));
+await submit('/profile', (f) => f.body.includes('start on the next one'), {});
+check('paying the bill clears what was set aside', !txt((await get('/dashboard')).html).includes('KES 15,000.00 set aside') && txt((await get('/dashboard')).html).includes('due 10 Jul 2099'));
+
+check('cash flow asks for a balance first', txt((await get('/cash-flow')).html).includes('Enter what you can spend today to begin'));
+await submit('/cash-flow', has('amount'), { amount: '12,000' });
+check('cash flow starts from it and lists what has no date', txt((await get('/cash-flow')).html).includes('KES 12,000.00') && txt((await get('/cash-flow')).html).includes('This is not the whole picture'));
+
+await submit('/check-ins', has('receivedOn'), { receivedOn: '2026-11-03', amount: '4500', source: 'Side job', itemId: '' });
+check('money received is listed', txt((await get('/check-ins')).html).includes('Side job'));
+await submit('/check-ins', (f) => f.hidden.what === 'check-in', {});
+check('a check-in can be taken back', txt((await get('/check-ins')).html).includes('taken back'));
+await submit('/check-ins', (f) => f.hidden.what === 'check-in', {});
+check('and put back', !txt((await get('/check-ins')).html).includes('taken back'));
+
+await submit('/goals', (f) => has('title')(f) && !f.hidden.id, { title: 'Desk', kind: 'purchase', target: '', current: '0', priority: '2', 'part.0.label': 'Top', 'part.0.amount': '8000', 'part.1.label': 'Legs', 'part.1.amount': '2000', targetDate: '2099-06-30', fundingOrder: '1', monthlyCap: '3000' });
+const goalsPage = txt((await get('/goals')).html);
+check('a goal is the total of its parts', goalsPage.includes('KES 0.00 of KES 10,000.00') && goalsPage.includes('Top, Legs'));
+check('a goal out of reach is said to be', goalsPage.includes('more than any month is known to leave over'));
+
+check('sharing out needs an amount', (await submit('/share-out', has('amount'), { amount: 'lots' })).includes('error='));
+await submit('/share-out', has('amount'), { amount: '90000' });
+let share = txt((await get('/share-out')).html);
+check('money goes to what is needed first', share.includes('What you cannot live without') && share.indexOf('Rent') < share.indexOf('School fees') && share.indexOf('School fees') < share.indexOf('Desk'));
+check('nothing moves before it is confirmed', txt((await get('/goals')).html).includes('KES 0.00 of KES 10,000.00'));
+await submit('/share-out', (f) => f.hidden.action === 'confirm', {});
+check('confirming moves the goal on', txt((await get('/goals')).html).includes('KES 3,000.00 of KES 10,000.00'), txt((await get('/goals')).html).slice(0, 600));
+await submit('/share-out', (f) => f.hidden.action === 'discard', {});
+check('taking it back moves it back', txt((await get('/goals')).html).includes('KES 0.00 of KES 10,000.00'));
 
 await submit('/dashboard', (f) => f.body.includes('Sign out'), {});
 check('signed out', (await get('/dashboard')).url.startsWith('/sign-in'));

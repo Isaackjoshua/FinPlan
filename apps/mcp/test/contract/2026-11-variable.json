@@ -1,0 +1,6975 @@
+{
+ "get_profile": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "sections": {
+     "type": "array",
+     "description": "Which parts to return. `summary` is totals only; `income`, `expenses`, `debts` and `savings` are the individual line items. `income_band` says whether income varies and what a lean, typical and good month work out to. `completeness` says whether the profile is complete enough to rely on.",
+     "default": [
+      "summary"
+     ],
+     "maxItems": 7,
+     "items": {
+      "type": "string",
+      "enum": [
+       "summary",
+       "income",
+       "expenses",
+       "debts",
+       "savings",
+       "income_band",
+       "completeness"
+      ]
+     }
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "country": {
+     "type": "string"
+    },
+    "revision": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "summary": {
+     "type": "object",
+     "properties": {
+      "monthly_income_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "monthly_expenses_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "monthly_essential_expenses_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "monthly_debt_minimums_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "monthly_surplus_minor": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "total_debt_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "total_savings_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "emergency_fund_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "highest_apr_bps": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 100000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "pay_frequency": {
+       "type": "string",
+       "enum": [
+        "weekly",
+        "fortnightly",
+        "monthly",
+        "quarterly",
+        "yearly"
+       ]
+      },
+      "household_size": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "user_text": {
+       "type": "object",
+       "properties": {
+        "notes": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": false
+      },
+      "warnings": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string"
+         },
+         "severity": {
+          "type": "string",
+          "enum": [
+           "info",
+           "warn"
+          ]
+         },
+         "message": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "code",
+         "severity",
+         "message"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "monthly_income_minor",
+      "monthly_expenses_minor",
+      "monthly_essential_expenses_minor",
+      "monthly_debt_minimums_minor",
+      "monthly_surplus_minor",
+      "total_debt_minor",
+      "total_savings_minor",
+      "emergency_fund_minor",
+      "highest_apr_bps",
+      "user_text",
+      "warnings"
+     ],
+     "additionalProperties": false
+    },
+    "income": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "frequency": {
+        "type": "string",
+        "enum": [
+         "weekly",
+         "fortnightly",
+         "monthly",
+         "quarterly",
+         "yearly"
+        ]
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "label"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "amount_minor",
+       "frequency",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "expenses": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "frequency": {
+        "type": "string",
+        "enum": [
+         "weekly",
+         "fortnightly",
+         "monthly",
+         "quarterly",
+         "yearly"
+        ]
+       },
+       "category": {
+        "type": "string",
+        "enum": [
+         "housing",
+         "utilities",
+         "food",
+         "transport",
+         "health",
+         "insurance",
+         "education",
+         "childcare",
+         "personal",
+         "entertainment",
+         "giving",
+         "other"
+        ]
+       },
+       "essential": {
+        "type": "boolean"
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "label"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "amount_minor",
+       "frequency",
+       "category",
+       "essential",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "debts": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "debt_kind": {
+        "type": "string",
+        "enum": [
+         "credit_card",
+         "personal_loan",
+         "student_loan",
+         "mortgage",
+         "vehicle",
+         "mobile_loan",
+         "informal",
+         "other"
+        ]
+       },
+       "balance_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "apr_bps": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100000
+       },
+       "minimum_payment_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "label"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "debt_kind",
+       "balance_minor",
+       "apr_bps",
+       "minimum_payment_minor",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "savings": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "balance_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "apy_bps": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100000
+       },
+       "is_emergency_fund": {
+        "type": "boolean"
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "label"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "balance_minor",
+       "apy_bps",
+       "is_emergency_fund",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "income_band": {
+     "type": "object",
+     "properties": {
+      "varies": {
+       "type": "boolean",
+       "description": "When true, monthly income and surplus in `summary` describe a lean month."
+      },
+      "basis": {
+       "type": "string",
+       "description": "declared: what the user said they expect, not measured.",
+       "enum": [
+        "declared"
+       ]
+      },
+      "lean_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "typical_minor": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "good_minor": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "sources": {
+       "type": "array",
+       "description": "Monthly, per income item.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "variability": {
+          "type": "string",
+          "enum": [
+           "fixed",
+           "variable"
+          ]
+         },
+         "lean_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "typical_minor": {
+          "anyOf": [
+           {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "good_minor": {
+          "anyOf": [
+           {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "variability",
+         "lean_minor",
+         "typical_minor",
+         "good_minor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "results": {
+       "description": "Null when income does not vary.",
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "scenarios": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "scenario": {
+              "type": "string",
+              "enum": [
+               "lean",
+               "typical",
+               "good"
+              ]
+             },
+             "income_minor": {
+              "description": "Null when no figure is recorded for this kind of month. Do not estimate one.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "balance_minor": {
+              "description": "Income minus all outgoings. Negative is a shortfall.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "essentials_balance_minor": {
+              "description": "Income minus essentials and minimum debt payments only.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "goal_funding_minor": {
+              "description": "How much of the planned goal contributions such a month can pay for.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000
+               },
+               {
+                "type": "null"
+               }
+              ]
+             }
+            },
+            "required": [
+             "scenario",
+             "income_minor",
+             "balance_minor",
+             "essentials_balance_minor",
+             "goal_funding_minor"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "break_even_minor": {
+           "type": "integer",
+           "description": "The income at which a month balances.",
+           "minimum": 0,
+           "maximum": 10000000000000
+          },
+          "essentials_break_even_minor": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 10000000000000
+          },
+          "lean_months_covered": {
+           "anyOf": [
+            {
+             "type": "number"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "description": "Lean months the emergency fund makes up for; null when a lean month has no shortfall."
+          },
+          "lean_months_of_essentials_covered": {
+           "anyOf": [
+            {
+             "type": "number"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "scenarios",
+          "break_even_minor",
+          "essentials_break_even_minor",
+          "lean_months_covered",
+          "lean_months_of_essentials_covered"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "varies",
+      "basis",
+      "lean_minor",
+      "typical_minor",
+      "good_minor",
+      "sources",
+      "results"
+     ],
+     "additionalProperties": false
+    },
+    "completeness": {
+     "type": "object",
+     "properties": {
+      "surplus_reliable": {
+       "type": "boolean",
+       "description": "When false, do not present the surplus as money the user has, or plan on it."
+      },
+      "acknowledged": {
+       "type": "array",
+       "description": "Checks the user has said are right for them.",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "surplus_reliable",
+      "acknowledged"
+     ],
+     "additionalProperties": false
+    }
+   },
+   "required": [
+    "currency",
+    "country",
+    "revision"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "list_goals": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "status": {
+     "type": "string",
+     "description": "Only goals with this status. Omit for all.",
+     "enum": [
+      "active",
+      "paused",
+      "achieved",
+      "abandoned"
+     ]
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "goals": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string",
+        "enum": [
+         "emergency_fund",
+         "debt_free",
+         "purchase",
+         "education",
+         "retirement",
+         "other"
+        ]
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "active",
+         "paused",
+         "achieved",
+         "abandoned"
+        ]
+       },
+       "priority": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "target_amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "current_amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "target_date": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "kind",
+       "status",
+       "priority",
+       "target_amount_minor",
+       "current_amount_minor",
+       "target_date",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "currency",
+    "goals"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "get_current_plan": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "detail": {
+     "type": "string",
+     "description": "`summary` gives totals; `full` adds the budget breakdown and the month-by-month debt schedule.",
+     "default": "summary",
+     "enum": [
+      "summary",
+      "full"
+     ]
+    },
+    "include": {
+     "type": "array",
+     "description": "`scenarios` adds lean, typical and good months when income varies.",
+     "maxItems": 1,
+     "items": {
+      "type": "string",
+      "enum": [
+       "scenarios"
+      ]
+     }
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "plan": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "version": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "saved_at": {
+         "type": "string"
+        },
+        "saved_by": {
+         "type": "string",
+         "enum": [
+          "user",
+          "agent"
+         ]
+        },
+        "is_current": {
+         "type": "boolean"
+        },
+        "user_text": {
+         "type": "object",
+         "properties": {
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "summary"
+         ],
+         "additionalProperties": false
+        },
+        "inputs": {
+         "type": "object",
+         "properties": {
+          "budget": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "category": {
+              "type": "string",
+              "enum": [
+               "housing",
+               "utilities",
+               "food",
+               "transport",
+               "health",
+               "insurance",
+               "education",
+               "childcare",
+               "personal",
+               "entertainment",
+               "giving",
+               "other"
+              ]
+             },
+             "amount_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "category",
+             "amount_minor"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "debt_strategy": {
+           "type": "string",
+           "enum": [
+            "snowball",
+            "avalanche"
+           ]
+          },
+          "extra_debt_payment_minor": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 10000000000000
+          },
+          "emergency_fund_months": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "goal_contributions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "goal_id": {
+              "type": "string"
+             },
+             "amount_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "goal_id",
+             "amount_minor"
+            ],
+            "additionalProperties": false
+           }
+          }
+         },
+         "required": [
+          "budget",
+          "extra_debt_payment_minor",
+          "emergency_fund_months",
+          "goal_contributions"
+         ],
+         "additionalProperties": false
+        },
+        "results": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "engine_version": {
+             "type": "string"
+            },
+            "start_month": {
+             "type": "string"
+            },
+            "monthly": {
+             "type": "object",
+             "properties": {
+              "income_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "budgeted_spending_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "debt_payments_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "goal_contributions_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "unallocated_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              }
+             },
+             "required": [
+              "income_minor",
+              "budgeted_spending_minor",
+              "debt_payments_minor",
+              "goal_contributions_minor",
+              "unallocated_minor"
+             ],
+             "additionalProperties": false
+            },
+            "budget": {
+             "type": "object",
+             "properties": {
+              "net_income_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "total_expenses_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "surplus_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "shortfall_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "savings_rate_bps": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "buckets": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "bucket": {
+                  "type": "string",
+                  "enum": [
+                   "needs",
+                   "wants",
+                   "savings"
+                  ]
+                 },
+                 "target_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "actual_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "difference_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 }
+                },
+                "required": [
+                 "bucket",
+                 "target_minor",
+                 "actual_minor",
+                 "difference_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "by_category": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "category": {
+                  "type": "string"
+                 },
+                 "amount_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "share_of_income_bps": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 }
+                },
+                "required": [
+                 "category",
+                 "amount_minor",
+                 "share_of_income_bps"
+                ],
+                "additionalProperties": false
+               }
+              }
+             },
+             "required": [
+              "net_income_minor",
+              "total_expenses_minor",
+              "surplus_minor",
+              "shortfall_minor",
+              "savings_rate_bps",
+              "buckets",
+              "by_category"
+             ],
+             "additionalProperties": false
+            },
+            "debt": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {
+                "snowball": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": true
+                    },
+                    "priority_order": {
+                     "type": "array",
+                     "items": {
+                      "type": "string"
+                     }
+                    },
+                    "months_to_debt_free": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "debt_free_month": {
+                     "anyOf": [
+                      {
+                       "type": "string"
+                      },
+                      {
+                       "type": "null"
+                      }
+                     ]
+                    },
+                    "total_interest_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "total_paid_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "schedule_truncated": {
+                     "type": "boolean"
+                    },
+                    "debts": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "id": {
+                        "type": "string"
+                       },
+                       "paid_off_in_month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "paid_off_month": {
+                        "anyOf": [
+                         {
+                          "type": "string"
+                         },
+                         {
+                          "type": "null"
+                         }
+                        ]
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "id",
+                       "paid_off_in_month",
+                       "paid_off_month",
+                       "interest_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    },
+                    "schedule": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "date": {
+                        "type": "string"
+                       },
+                       "payment_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "remaining_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "month",
+                       "date",
+                       "payment_minor",
+                       "interest_minor",
+                       "remaining_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "priority_order",
+                    "months_to_debt_free",
+                    "debt_free_month",
+                    "total_interest_minor",
+                    "total_paid_minor",
+                    "schedule_truncated"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": false
+                    },
+                    "reason": {
+                     "type": "string",
+                     "enum": [
+                      "budget_below_minimums",
+                      "not_paid_off_within_50_years"
+                     ]
+                    },
+                    "minimum_budget_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "reason",
+                    "minimum_budget_minor"
+                   ],
+                   "additionalProperties": false
+                  }
+                 ]
+                },
+                "avalanche": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": true
+                    },
+                    "priority_order": {
+                     "type": "array",
+                     "items": {
+                      "type": "string"
+                     }
+                    },
+                    "months_to_debt_free": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "debt_free_month": {
+                     "anyOf": [
+                      {
+                       "type": "string"
+                      },
+                      {
+                       "type": "null"
+                      }
+                     ]
+                    },
+                    "total_interest_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "total_paid_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "schedule_truncated": {
+                     "type": "boolean"
+                    },
+                    "debts": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "id": {
+                        "type": "string"
+                       },
+                       "paid_off_in_month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "paid_off_month": {
+                        "anyOf": [
+                         {
+                          "type": "string"
+                         },
+                         {
+                          "type": "null"
+                         }
+                        ]
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "id",
+                       "paid_off_in_month",
+                       "paid_off_month",
+                       "interest_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    },
+                    "schedule": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "date": {
+                        "type": "string"
+                       },
+                       "payment_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "remaining_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "month",
+                       "date",
+                       "payment_minor",
+                       "interest_minor",
+                       "remaining_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "priority_order",
+                    "months_to_debt_free",
+                    "debt_free_month",
+                    "total_interest_minor",
+                    "total_paid_minor",
+                    "schedule_truncated"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": false
+                    },
+                    "reason": {
+                     "type": "string",
+                     "enum": [
+                      "budget_below_minimums",
+                      "not_paid_off_within_50_years"
+                     ]
+                    },
+                    "minimum_budget_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "reason",
+                    "minimum_budget_minor"
+                   ],
+                   "additionalProperties": false
+                  }
+                 ]
+                },
+                "difference": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "interest_saved_by_avalanche_minor": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "months_saved_by_avalanche": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    }
+                   },
+                   "required": [
+                    "interest_saved_by_avalanche_minor",
+                    "months_saved_by_avalanche"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                }
+               },
+               "required": [
+                "snowball",
+                "avalanche",
+                "difference"
+               ],
+               "additionalProperties": false
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "emergency_fund": {
+             "type": "object",
+             "properties": {
+              "target_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "gap_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "months_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "months_to_target": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "target_reached_month": {
+               "anyOf": [
+                {
+                 "type": "string"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              }
+             },
+             "required": [
+              "target_minor",
+              "gap_minor",
+              "months_covered",
+              "months_to_target",
+              "target_reached_month"
+             ],
+             "additionalProperties": false
+            },
+            "goals": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "goal_id": {
+                "type": "string"
+               },
+               "months_to_target": {
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "target_reached_month": {
+                "anyOf": [
+                 {
+                  "type": "string"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               }
+              },
+              "required": [
+               "goal_id",
+               "months_to_target",
+               "target_reached_month"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "warnings": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "code": {
+                "type": "string"
+               },
+               "severity": {
+                "type": "string",
+                "enum": [
+                 "info",
+                 "warn"
+                ]
+               },
+               "message": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "code",
+               "severity",
+               "message"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "scenarios": {
+             "type": "object",
+             "description": "Only when asked for and income varies; `monthly` then describes a lean month.",
+             "properties": {
+              "scenarios": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "scenario": {
+                  "type": "string",
+                  "enum": [
+                   "lean",
+                   "typical",
+                   "good"
+                  ]
+                 },
+                 "income_minor": {
+                  "description": "Null when no figure is recorded for this kind of month. Do not estimate one.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "balance_minor": {
+                  "description": "Income minus all outgoings. Negative is a shortfall.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "essentials_balance_minor": {
+                  "description": "Income minus essentials and minimum debt payments only.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "goal_funding_minor": {
+                  "description": "How much of the planned goal contributions such a month can pay for.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 }
+                },
+                "required": [
+                 "scenario",
+                 "income_minor",
+                 "balance_minor",
+                 "essentials_balance_minor",
+                 "goal_funding_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "break_even_minor": {
+               "type": "integer",
+               "description": "The income at which a month balances.",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "essentials_break_even_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "lean_months_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ],
+               "description": "Lean months the emergency fund makes up for; null when a lean month has no shortfall."
+              },
+              "lean_months_of_essentials_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "basis": {
+               "type": "string",
+               "description": "declared: what the user said they expect, not measured.",
+               "enum": [
+                "declared"
+               ]
+              },
+              "omitted_spending_minor": {
+               "type": "integer",
+               "description": "Spending in the profile that the plan leaves out. The scenarios count it.",
+               "minimum": 0,
+               "maximum": 10000000000000
+              }
+             },
+             "required": [
+              "scenarios",
+              "break_even_minor",
+              "essentials_break_even_minor",
+              "lean_months_covered",
+              "lean_months_of_essentials_covered",
+              "basis",
+              "omitted_spending_minor"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "required": [
+            "engine_version",
+            "start_month",
+            "monthly",
+            "debt",
+            "emergency_fund",
+            "goals",
+            "warnings"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "version",
+        "saved_at",
+        "saved_by",
+        "is_current",
+        "user_text",
+        "inputs",
+        "results"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "currency",
+    "plan"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "list_plan_versions": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "limit": {
+     "type": "integer",
+     "default": 20,
+     "minimum": 1,
+     "maximum": 50
+    },
+    "cursor": {
+     "type": "string",
+     "description": "`next_cursor` from the previous page.",
+     "pattern": "^\\d{1,9}$"
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "versions": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "version": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "saved_at": {
+        "type": "string"
+       },
+       "saved_by": {
+        "type": "string",
+        "enum": [
+         "user",
+         "agent"
+        ]
+       },
+       "is_current": {
+        "type": "boolean"
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "summary": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "summary"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "version",
+       "saved_at",
+       "saved_by",
+       "is_current",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "next_cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "versions",
+    "next_cursor"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "get_plan_version": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "version": {
+     "type": "integer",
+     "exclusiveMinimum": 0,
+     "maximum": 9007199254740991
+    },
+    "detail": {
+     "type": "string",
+     "description": "`summary` gives totals; `full` adds the budget breakdown and the month-by-month debt schedule.",
+     "default": "summary",
+     "enum": [
+      "summary",
+      "full"
+     ]
+    },
+    "include": {
+     "type": "array",
+     "description": "`scenarios` adds lean, typical and good months when income varies.",
+     "maxItems": 1,
+     "items": {
+      "type": "string",
+      "enum": [
+       "scenarios"
+      ]
+     }
+    }
+   },
+   "required": [
+    "version"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "plan": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "version": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "saved_at": {
+         "type": "string"
+        },
+        "saved_by": {
+         "type": "string",
+         "enum": [
+          "user",
+          "agent"
+         ]
+        },
+        "is_current": {
+         "type": "boolean"
+        },
+        "user_text": {
+         "type": "object",
+         "properties": {
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "summary"
+         ],
+         "additionalProperties": false
+        },
+        "inputs": {
+         "type": "object",
+         "properties": {
+          "budget": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "category": {
+              "type": "string",
+              "enum": [
+               "housing",
+               "utilities",
+               "food",
+               "transport",
+               "health",
+               "insurance",
+               "education",
+               "childcare",
+               "personal",
+               "entertainment",
+               "giving",
+               "other"
+              ]
+             },
+             "amount_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "category",
+             "amount_minor"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "debt_strategy": {
+           "type": "string",
+           "enum": [
+            "snowball",
+            "avalanche"
+           ]
+          },
+          "extra_debt_payment_minor": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 10000000000000
+          },
+          "emergency_fund_months": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "goal_contributions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "goal_id": {
+              "type": "string"
+             },
+             "amount_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "goal_id",
+             "amount_minor"
+            ],
+            "additionalProperties": false
+           }
+          }
+         },
+         "required": [
+          "budget",
+          "extra_debt_payment_minor",
+          "emergency_fund_months",
+          "goal_contributions"
+         ],
+         "additionalProperties": false
+        },
+        "results": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "engine_version": {
+             "type": "string"
+            },
+            "start_month": {
+             "type": "string"
+            },
+            "monthly": {
+             "type": "object",
+             "properties": {
+              "income_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "budgeted_spending_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "debt_payments_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "goal_contributions_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "unallocated_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              }
+             },
+             "required": [
+              "income_minor",
+              "budgeted_spending_minor",
+              "debt_payments_minor",
+              "goal_contributions_minor",
+              "unallocated_minor"
+             ],
+             "additionalProperties": false
+            },
+            "budget": {
+             "type": "object",
+             "properties": {
+              "net_income_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "total_expenses_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "surplus_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "shortfall_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "savings_rate_bps": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "buckets": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "bucket": {
+                  "type": "string",
+                  "enum": [
+                   "needs",
+                   "wants",
+                   "savings"
+                  ]
+                 },
+                 "target_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "actual_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "difference_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 }
+                },
+                "required": [
+                 "bucket",
+                 "target_minor",
+                 "actual_minor",
+                 "difference_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "by_category": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "category": {
+                  "type": "string"
+                 },
+                 "amount_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "share_of_income_bps": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 }
+                },
+                "required": [
+                 "category",
+                 "amount_minor",
+                 "share_of_income_bps"
+                ],
+                "additionalProperties": false
+               }
+              }
+             },
+             "required": [
+              "net_income_minor",
+              "total_expenses_minor",
+              "surplus_minor",
+              "shortfall_minor",
+              "savings_rate_bps",
+              "buckets",
+              "by_category"
+             ],
+             "additionalProperties": false
+            },
+            "debt": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {
+                "snowball": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": true
+                    },
+                    "priority_order": {
+                     "type": "array",
+                     "items": {
+                      "type": "string"
+                     }
+                    },
+                    "months_to_debt_free": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "debt_free_month": {
+                     "anyOf": [
+                      {
+                       "type": "string"
+                      },
+                      {
+                       "type": "null"
+                      }
+                     ]
+                    },
+                    "total_interest_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "total_paid_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "schedule_truncated": {
+                     "type": "boolean"
+                    },
+                    "debts": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "id": {
+                        "type": "string"
+                       },
+                       "paid_off_in_month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "paid_off_month": {
+                        "anyOf": [
+                         {
+                          "type": "string"
+                         },
+                         {
+                          "type": "null"
+                         }
+                        ]
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "id",
+                       "paid_off_in_month",
+                       "paid_off_month",
+                       "interest_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    },
+                    "schedule": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "date": {
+                        "type": "string"
+                       },
+                       "payment_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "remaining_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "month",
+                       "date",
+                       "payment_minor",
+                       "interest_minor",
+                       "remaining_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "priority_order",
+                    "months_to_debt_free",
+                    "debt_free_month",
+                    "total_interest_minor",
+                    "total_paid_minor",
+                    "schedule_truncated"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": false
+                    },
+                    "reason": {
+                     "type": "string",
+                     "enum": [
+                      "budget_below_minimums",
+                      "not_paid_off_within_50_years"
+                     ]
+                    },
+                    "minimum_budget_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "reason",
+                    "minimum_budget_minor"
+                   ],
+                   "additionalProperties": false
+                  }
+                 ]
+                },
+                "avalanche": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": true
+                    },
+                    "priority_order": {
+                     "type": "array",
+                     "items": {
+                      "type": "string"
+                     }
+                    },
+                    "months_to_debt_free": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "debt_free_month": {
+                     "anyOf": [
+                      {
+                       "type": "string"
+                      },
+                      {
+                       "type": "null"
+                      }
+                     ]
+                    },
+                    "total_interest_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "total_paid_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    },
+                    "schedule_truncated": {
+                     "type": "boolean"
+                    },
+                    "debts": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "id": {
+                        "type": "string"
+                       },
+                       "paid_off_in_month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "paid_off_month": {
+                        "anyOf": [
+                         {
+                          "type": "string"
+                         },
+                         {
+                          "type": "null"
+                         }
+                        ]
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "id",
+                       "paid_off_in_month",
+                       "paid_off_month",
+                       "interest_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    },
+                    "schedule": {
+                     "type": "array",
+                     "items": {
+                      "type": "object",
+                      "properties": {
+                       "month": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                       },
+                       "date": {
+                        "type": "string"
+                       },
+                       "payment_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "interest_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       },
+                       "remaining_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000000
+                       }
+                      },
+                      "required": [
+                       "month",
+                       "date",
+                       "payment_minor",
+                       "interest_minor",
+                       "remaining_minor"
+                      ],
+                      "additionalProperties": false
+                     }
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "priority_order",
+                    "months_to_debt_free",
+                    "debt_free_month",
+                    "total_interest_minor",
+                    "total_paid_minor",
+                    "schedule_truncated"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "object",
+                   "properties": {
+                    "strategy": {
+                     "type": "string",
+                     "enum": [
+                      "snowball",
+                      "avalanche"
+                     ]
+                    },
+                    "feasible": {
+                     "type": "boolean",
+                     "const": false
+                    },
+                    "reason": {
+                     "type": "string",
+                     "enum": [
+                      "budget_below_minimums",
+                      "not_paid_off_within_50_years"
+                     ]
+                    },
+                    "minimum_budget_minor": {
+                     "type": "integer",
+                     "minimum": 0,
+                     "maximum": 10000000000000
+                    }
+                   },
+                   "required": [
+                    "strategy",
+                    "feasible",
+                    "reason",
+                    "minimum_budget_minor"
+                   ],
+                   "additionalProperties": false
+                  }
+                 ]
+                },
+                "difference": {
+                 "anyOf": [
+                  {
+                   "type": "object",
+                   "properties": {
+                    "interest_saved_by_avalanche_minor": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    },
+                    "months_saved_by_avalanche": {
+                     "type": "integer",
+                     "minimum": -9007199254740991,
+                     "maximum": 9007199254740991
+                    }
+                   },
+                   "required": [
+                    "interest_saved_by_avalanche_minor",
+                    "months_saved_by_avalanche"
+                   ],
+                   "additionalProperties": false
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                }
+               },
+               "required": [
+                "snowball",
+                "avalanche",
+                "difference"
+               ],
+               "additionalProperties": false
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "emergency_fund": {
+             "type": "object",
+             "properties": {
+              "target_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "gap_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "months_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "months_to_target": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "target_reached_month": {
+               "anyOf": [
+                {
+                 "type": "string"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              }
+             },
+             "required": [
+              "target_minor",
+              "gap_minor",
+              "months_covered",
+              "months_to_target",
+              "target_reached_month"
+             ],
+             "additionalProperties": false
+            },
+            "goals": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "goal_id": {
+                "type": "string"
+               },
+               "months_to_target": {
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "target_reached_month": {
+                "anyOf": [
+                 {
+                  "type": "string"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               }
+              },
+              "required": [
+               "goal_id",
+               "months_to_target",
+               "target_reached_month"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "warnings": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "code": {
+                "type": "string"
+               },
+               "severity": {
+                "type": "string",
+                "enum": [
+                 "info",
+                 "warn"
+                ]
+               },
+               "message": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "code",
+               "severity",
+               "message"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "scenarios": {
+             "type": "object",
+             "description": "Only when asked for and income varies; `monthly` then describes a lean month.",
+             "properties": {
+              "scenarios": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "scenario": {
+                  "type": "string",
+                  "enum": [
+                   "lean",
+                   "typical",
+                   "good"
+                  ]
+                 },
+                 "income_minor": {
+                  "description": "Null when no figure is recorded for this kind of month. Do not estimate one.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "balance_minor": {
+                  "description": "Income minus all outgoings. Negative is a shortfall.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "essentials_balance_minor": {
+                  "description": "Income minus essentials and minimum debt payments only.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "goal_funding_minor": {
+                  "description": "How much of the planned goal contributions such a month can pay for.",
+                  "anyOf": [
+                   {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 }
+                },
+                "required": [
+                 "scenario",
+                 "income_minor",
+                 "balance_minor",
+                 "essentials_balance_minor",
+                 "goal_funding_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "break_even_minor": {
+               "type": "integer",
+               "description": "The income at which a month balances.",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "essentials_break_even_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "lean_months_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ],
+               "description": "Lean months the emergency fund makes up for; null when a lean month has no shortfall."
+              },
+              "lean_months_of_essentials_covered": {
+               "anyOf": [
+                {
+                 "type": "number"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "basis": {
+               "type": "string",
+               "description": "declared: what the user said they expect, not measured.",
+               "enum": [
+                "declared"
+               ]
+              },
+              "omitted_spending_minor": {
+               "type": "integer",
+               "description": "Spending in the profile that the plan leaves out. The scenarios count it.",
+               "minimum": 0,
+               "maximum": 10000000000000
+              }
+             },
+             "required": [
+              "scenarios",
+              "break_even_minor",
+              "essentials_break_even_minor",
+              "lean_months_covered",
+              "lean_months_of_essentials_covered",
+              "basis",
+              "omitted_spending_minor"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "required": [
+            "engine_version",
+            "start_month",
+            "monthly",
+            "debt",
+            "emergency_fund",
+            "goals",
+            "warnings"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "version",
+        "saved_at",
+        "saved_by",
+        "is_current",
+        "user_text",
+        "inputs",
+        "results"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "currency",
+    "plan"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "list_check_ins": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "since": {
+     "type": "string",
+     "description": "Only check-ins whose period ends on or after this date.",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "limit": {
+     "type": "integer",
+     "default": 12,
+     "minimum": 1,
+     "maximum": 50
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "check_ins": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "period_start": {
+        "type": "string"
+       },
+       "period_end": {
+        "type": "string"
+       },
+       "logged_at": {
+        "type": "string"
+       },
+       "logged_by": {
+        "type": "string",
+        "enum": [
+         "user",
+         "agent"
+        ]
+       },
+       "actuals": {
+        "type": "object",
+        "properties": {
+         "income_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "spending": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "category": {
+             "type": "string",
+             "enum": [
+              "housing",
+              "utilities",
+              "food",
+              "transport",
+              "health",
+              "insurance",
+              "education",
+              "childcare",
+              "personal",
+              "entertainment",
+              "giving",
+              "other"
+             ]
+            },
+            "amount_minor": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 10000000000000
+            }
+           },
+           "required": [
+            "category",
+            "amount_minor"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "debt_payments_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "savings_added_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         }
+        },
+        "required": [
+         "income_minor",
+         "spending",
+         "debt_payments_minor",
+         "savings_added_minor"
+        ],
+        "additionalProperties": false
+       },
+       "variance": {
+        "anyOf": [
+         {
+          "type": "object",
+          "properties": {
+           "period_days": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "spending": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "planned_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "actual_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "difference_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "category": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "planned_minor",
+              "actual_minor",
+              "difference_minor",
+              "category"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "income": {
+            "type": "object",
+            "properties": {
+             "planned_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "actual_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "difference_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             }
+            },
+            "required": [
+             "planned_minor",
+             "actual_minor",
+             "difference_minor"
+            ],
+            "additionalProperties": false
+           },
+           "debt_payments": {
+            "type": "object",
+            "properties": {
+             "planned_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "actual_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "difference_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             }
+            },
+            "required": [
+             "planned_minor",
+             "actual_minor",
+             "difference_minor"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "required": [
+           "period_days",
+           "spending",
+           "income",
+           "debt_payments"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "user_text": {
+        "type": "object",
+        "properties": {
+         "note": {
+          "type": "string"
+         }
+        },
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "id",
+       "period_start",
+       "period_end",
+       "logged_at",
+       "logged_by",
+       "actuals",
+       "variance",
+       "user_text"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "currency",
+    "check_ins"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "get_progress": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {},
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "currency": {
+     "type": "string"
+    },
+    "goals": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "percent": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "remaining_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       }
+      },
+      "required": [
+       "id",
+       "status",
+       "percent",
+       "remaining_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "total_debt_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "total_savings_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "emergency_fund_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "plan": {
+     "type": "object",
+     "properties": {
+      "versions": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "current_version": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "last_saved_at": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "versions",
+      "current_version",
+      "last_saved_at"
+     ],
+     "additionalProperties": false
+    },
+    "check_ins": {
+     "type": "object",
+     "properties": {
+      "count": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "last_period_end": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "debt_payments_logged_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "savings_added_logged_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      }
+     },
+     "required": [
+      "count",
+      "last_period_end",
+      "debt_payments_logged_minor",
+      "savings_added_logged_minor"
+     ],
+     "additionalProperties": false
+    },
+    "lessons": {
+     "type": "object",
+     "properties": {
+      "assigned": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "completed": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "quizzes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "best_score": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         }
+        },
+        "required": [
+         "slug",
+         "best_score"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "assigned",
+      "completed",
+      "quizzes"
+     ],
+     "additionalProperties": false
+    }
+   },
+   "required": [
+    "currency",
+    "goals",
+    "total_debt_minor",
+    "total_savings_minor",
+    "emergency_fund_minor",
+    "plan",
+    "check_ins",
+    "lessons"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "list_lessons": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "topic": {
+     "type": "string",
+     "enum": [
+      "budgeting",
+      "debt",
+      "saving",
+      "planning"
+     ]
+    },
+    "difficulty": {
+     "anyOf": [
+      {
+       "type": "number",
+       "const": 1
+      },
+      {
+       "type": "number",
+       "const": 2
+      },
+      {
+       "type": "number",
+       "const": 3
+      }
+     ]
+    },
+    "tag": {
+     "type": "string",
+     "enum": [
+      "getting-started",
+      "overspending",
+      "irregular-income",
+      "debt",
+      "high-interest-debt",
+      "borrowing",
+      "emergency-fund",
+      "saving",
+      "goals"
+     ]
+    }
+   },
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "lessons": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "slug": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "topic": {
+        "type": "string",
+        "enum": [
+         "budgeting",
+         "debt",
+         "saving",
+         "planning"
+        ]
+       },
+       "difficulty": {
+        "type": "integer",
+        "description": "1 = no background needed, 3 = more involved.",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "minutes": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "slug",
+       "title",
+       "topic",
+       "difficulty",
+       "minutes",
+       "tags"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "lessons"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "get_lesson": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "slug": {
+     "type": "string",
+     "maxLength": 80
+    }
+   },
+   "required": [
+    "slug"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "slug": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "topic": {
+     "type": "string",
+     "enum": [
+      "budgeting",
+      "debt",
+      "saving",
+      "planning"
+     ]
+    },
+    "difficulty": {
+     "type": "integer",
+     "description": "1 = no background needed, 3 = more involved.",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "minutes": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "summary": {
+     "type": "string"
+    },
+    "objectives": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "quiz_question_count": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "url": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "slug",
+    "title",
+    "topic",
+    "difficulty",
+    "minutes",
+    "tags",
+    "summary",
+    "objectives",
+    "quiz_question_count",
+    "url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "update_profile": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "expected_revision": {
+     "type": "integer",
+     "description": "The `revision` from your most recent get_profile.",
+     "exclusiveMinimum": 0,
+     "maximum": 9007199254740991
+    },
+    "details": {
+     "type": "object",
+     "description": "Household details. Only the fields you include are changed.",
+     "properties": {
+      "pay_frequency": {
+       "type": "string",
+       "enum": [
+        "weekly",
+        "fortnightly",
+        "monthly",
+        "quarterly",
+        "yearly"
+       ]
+      },
+      "household_size": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 30
+      },
+      "notes": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false
+    },
+    "items": {
+     "type": "array",
+     "maxItems": 30,
+     "items": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "type": "string",
+          "const": "upsert"
+         },
+         "id": {
+          "type": "string",
+          "description": "Omit to create; give an existing id to replace that item. Anything it holds that these fields do not cover is kept.",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         },
+         "item": {
+          "oneOf": [
+           {
+            "type": "object",
+            "properties": {
+             "kind": {
+              "type": "string",
+              "const": "income"
+             },
+             "label": {
+              "type": "string",
+              "description": "Short name shown to the user, e.g. \"Salary\" or \"Rent\".",
+              "minLength": 1,
+              "maxLength": 80
+             },
+             "amount_minor": {
+              "type": "integer",
+              "description": "For variable income, the least the user can count on in a month (0 if nothing is certain).",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "frequency": {
+              "type": "string",
+              "description": "Variable income is always \"monthly\".",
+              "enum": [
+               "weekly",
+               "fortnightly",
+               "monthly",
+               "quarterly",
+               "yearly"
+              ]
+             },
+             "variability": {
+              "type": "string",
+              "description": "\"variable\" when what comes in changes from month to month. Give it whenever you change an income item.",
+              "enum": [
+               "fixed",
+               "variable"
+              ]
+             },
+             "typical_minor": {
+              "description": "Variable income only: a typical month, if the user knows it. Leave out what they do not know; null clears it.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "high_minor": {
+              "description": "Variable income only: a good month, if the user knows it.",
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000
+               },
+               {
+                "type": "null"
+               }
+              ]
+             }
+            },
+            "required": [
+             "kind",
+             "label",
+             "amount_minor",
+             "frequency"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "object",
+            "properties": {
+             "kind": {
+              "type": "string",
+              "const": "expense"
+             },
+             "label": {
+              "type": "string",
+              "description": "Short name shown to the user, e.g. \"Salary\" or \"Rent\".",
+              "minLength": 1,
+              "maxLength": 80
+             },
+             "amount_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "frequency": {
+              "type": "string",
+              "enum": [
+               "weekly",
+               "fortnightly",
+               "monthly",
+               "quarterly",
+               "yearly"
+              ]
+             },
+             "category": {
+              "type": "string",
+              "enum": [
+               "housing",
+               "utilities",
+               "food",
+               "transport",
+               "health",
+               "insurance",
+               "education",
+               "childcare",
+               "personal",
+               "entertainment",
+               "giving",
+               "other"
+              ]
+             },
+             "essential": {
+              "type": "boolean",
+              "description": "True for needs (housing, food, utilities…), false for wants."
+             }
+            },
+            "required": [
+             "kind",
+             "label",
+             "amount_minor",
+             "frequency",
+             "category",
+             "essential"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "object",
+            "properties": {
+             "kind": {
+              "type": "string",
+              "const": "debt"
+             },
+             "label": {
+              "type": "string",
+              "description": "Short name shown to the user, e.g. \"Salary\" or \"Rent\".",
+              "minLength": 1,
+              "maxLength": 80
+             },
+             "debt_kind": {
+              "type": "string",
+              "enum": [
+               "credit_card",
+               "personal_loan",
+               "student_loan",
+               "mortgage",
+               "vehicle",
+               "mobile_loan",
+               "informal",
+               "other"
+              ]
+             },
+             "balance_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "apr_bps": {
+              "type": "integer",
+              "description": "Annual interest rate in basis points: 1999 = 19.99%.",
+              "minimum": 0,
+              "maximum": 100000
+             },
+             "minimum_payment_minor": {
+              "type": "integer",
+              "description": "Minimum payment per month.",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "kind",
+             "label",
+             "debt_kind",
+             "balance_minor",
+             "apr_bps",
+             "minimum_payment_minor"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "object",
+            "properties": {
+             "kind": {
+              "type": "string",
+              "const": "savings"
+             },
+             "label": {
+              "type": "string",
+              "description": "Short name shown to the user, e.g. \"Salary\" or \"Rent\".",
+              "minLength": 1,
+              "maxLength": 80
+             },
+             "balance_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "apy_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+             },
+             "is_emergency_fund": {
+              "type": "boolean"
+             }
+            },
+            "required": [
+             "kind",
+             "label",
+             "balance_minor",
+             "apy_bps",
+             "is_emergency_fund"
+            ],
+            "additionalProperties": false
+           }
+          ]
+         }
+        },
+        "required": [
+         "op",
+         "item"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "type": "string",
+          "const": "archive"
+         },
+         "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         }
+        },
+        "required": [
+         "op",
+         "id"
+        ],
+        "additionalProperties": false
+       }
+      ]
+     }
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "expected_revision"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "revision": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "created": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "kind"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "updated": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "archived": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "details_changed": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "warnings": {
+     "type": "array",
+     "description": "Things in the resulting profile worth raising with the user.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       },
+       "severity": {
+        "type": "string",
+        "enum": [
+         "info",
+         "warn"
+        ]
+       },
+       "message": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code",
+       "severity",
+       "message"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "revision",
+    "created",
+    "updated",
+    "archived",
+    "details_changed",
+    "warnings"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "create_goal": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "enum": [
+      "emergency_fund",
+      "debt_free",
+      "purchase",
+      "education",
+      "retirement",
+      "other"
+     ]
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "target_amount_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "current_amount_minor": {
+     "type": "integer",
+     "description": "How much has been put towards the goal so far.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "target_date": {
+     "type": "string",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "priority": {
+     "type": "integer",
+     "description": "1 is most important, 5 least.",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "kind",
+    "title",
+    "target_amount_minor"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "goal_id": {
+     "type": "string"
+    },
+    "revision": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    }
+   },
+   "required": [
+    "goal_id",
+    "revision"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "update_goal": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "goal_id": {
+     "type": "string",
+     "format": "uuid",
+     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "target_amount_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "current_amount_minor": {
+     "type": "integer",
+     "description": "How much has been put towards the goal so far.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "target_date": {
+     "type": "string",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "priority": {
+     "type": "integer",
+     "description": "1 is most important, 5 least.",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "active",
+      "paused",
+      "achieved",
+      "abandoned"
+     ]
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "goal_id"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "goal_id": {
+     "type": "string"
+    },
+    "changed_fields": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "revision": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    }
+   },
+   "required": [
+    "goal_id",
+    "changed_fields",
+    "revision"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "save_plan_version": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "summary": {
+     "type": "string",
+     "description": "A short plain-language description of this plan and what changed, for the user to read later.",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "budget": {
+     "type": "array",
+     "description": "Planned monthly spending per category.",
+     "maxItems": 20,
+     "items": {
+      "type": "object",
+      "properties": {
+       "category": {
+        "type": "string",
+        "enum": [
+         "housing",
+         "utilities",
+         "food",
+         "transport",
+         "health",
+         "insurance",
+         "education",
+         "childcare",
+         "personal",
+         "entertainment",
+         "giving",
+         "other"
+        ]
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       }
+      },
+      "required": [
+       "category",
+       "amount_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "debt_strategy": {
+     "type": "string",
+     "description": "snowball: smallest balance first. avalanche: highest interest rate first.",
+     "enum": [
+      "snowball",
+      "avalanche"
+     ]
+    },
+    "extra_debt_payment_minor": {
+     "type": "integer",
+     "description": "Monthly amount towards debt on top of the minimum payments.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "emergency_fund_months": {
+     "type": "integer",
+     "description": "How many months of essential spending the emergency fund should cover (default 3).",
+     "minimum": 0,
+     "maximum": 24
+    },
+    "goal_contributions": {
+     "type": "array",
+     "description": "Monthly amount towards each goal.",
+     "maxItems": 20,
+     "items": {
+      "type": "object",
+      "properties": {
+       "goal_id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       }
+      },
+      "required": [
+       "goal_id",
+       "amount_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "base_version": {
+     "type": "integer",
+     "description": "The version you based this on. If given, the save is refused when the current version is a different one.",
+     "exclusiveMinimum": 0,
+     "maximum": 9007199254740991
+    },
+    "include": {
+     "type": "array",
+     "description": "`scenarios` adds lean, typical and good months when income varies.",
+     "maxItems": 1,
+     "items": {
+      "type": "string",
+      "enum": [
+       "scenarios"
+      ]
+     }
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "summary",
+    "budget"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "version": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "currency": {
+     "type": "string"
+    },
+    "results": {
+     "type": "object",
+     "properties": {
+      "engine_version": {
+       "type": "string"
+      },
+      "start_month": {
+       "type": "string"
+      },
+      "monthly": {
+       "type": "object",
+       "properties": {
+        "income_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "budgeted_spending_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "debt_payments_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "goal_contributions_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "unallocated_minor": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        }
+       },
+       "required": [
+        "income_minor",
+        "budgeted_spending_minor",
+        "debt_payments_minor",
+        "goal_contributions_minor",
+        "unallocated_minor"
+       ],
+       "additionalProperties": false
+      },
+      "budget": {
+       "type": "object",
+       "properties": {
+        "net_income_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "total_expenses_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "surplus_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "shortfall_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "savings_rate_bps": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "buckets": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "bucket": {
+            "type": "string",
+            "enum": [
+             "needs",
+             "wants",
+             "savings"
+            ]
+           },
+           "target_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "actual_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "difference_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           }
+          },
+          "required": [
+           "bucket",
+           "target_minor",
+           "actual_minor",
+           "difference_minor"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "by_category": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "category": {
+            "type": "string"
+           },
+           "amount_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           "share_of_income_bps": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           }
+          },
+          "required": [
+           "category",
+           "amount_minor",
+           "share_of_income_bps"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "net_income_minor",
+        "total_expenses_minor",
+        "surplus_minor",
+        "shortfall_minor",
+        "savings_rate_bps",
+        "buckets",
+        "by_category"
+       ],
+       "additionalProperties": false
+      },
+      "debt": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "snowball": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "strategy": {
+               "type": "string",
+               "enum": [
+                "snowball",
+                "avalanche"
+               ]
+              },
+              "feasible": {
+               "type": "boolean",
+               "const": true
+              },
+              "priority_order": {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              },
+              "months_to_debt_free": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "debt_free_month": {
+               "anyOf": [
+                {
+                 "type": "string"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "total_interest_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "total_paid_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "schedule_truncated": {
+               "type": "boolean"
+              },
+              "debts": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "id": {
+                  "type": "string"
+                 },
+                 "paid_off_in_month": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "paid_off_month": {
+                  "anyOf": [
+                   {
+                    "type": "string"
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "interest_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 }
+                },
+                "required": [
+                 "id",
+                 "paid_off_in_month",
+                 "paid_off_month",
+                 "interest_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "schedule": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "month": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "date": {
+                  "type": "string"
+                 },
+                 "payment_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "interest_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "remaining_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 }
+                },
+                "required": [
+                 "month",
+                 "date",
+                 "payment_minor",
+                 "interest_minor",
+                 "remaining_minor"
+                ],
+                "additionalProperties": false
+               }
+              }
+             },
+             "required": [
+              "strategy",
+              "feasible",
+              "priority_order",
+              "months_to_debt_free",
+              "debt_free_month",
+              "total_interest_minor",
+              "total_paid_minor",
+              "schedule_truncated"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "object",
+             "properties": {
+              "strategy": {
+               "type": "string",
+               "enum": [
+                "snowball",
+                "avalanche"
+               ]
+              },
+              "feasible": {
+               "type": "boolean",
+               "const": false
+              },
+              "reason": {
+               "type": "string",
+               "enum": [
+                "budget_below_minimums",
+                "not_paid_off_within_50_years"
+               ]
+              },
+              "minimum_budget_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              }
+             },
+             "required": [
+              "strategy",
+              "feasible",
+              "reason",
+              "minimum_budget_minor"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "avalanche": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "strategy": {
+               "type": "string",
+               "enum": [
+                "snowball",
+                "avalanche"
+               ]
+              },
+              "feasible": {
+               "type": "boolean",
+               "const": true
+              },
+              "priority_order": {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              },
+              "months_to_debt_free": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "debt_free_month": {
+               "anyOf": [
+                {
+                 "type": "string"
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "total_interest_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "total_paid_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              },
+              "schedule_truncated": {
+               "type": "boolean"
+              },
+              "debts": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "id": {
+                  "type": "string"
+                 },
+                 "paid_off_in_month": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "paid_off_month": {
+                  "anyOf": [
+                   {
+                    "type": "string"
+                   },
+                   {
+                    "type": "null"
+                   }
+                  ]
+                 },
+                 "interest_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 }
+                },
+                "required": [
+                 "id",
+                 "paid_off_in_month",
+                 "paid_off_month",
+                 "interest_minor"
+                ],
+                "additionalProperties": false
+               }
+              },
+              "schedule": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "month": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                 },
+                 "date": {
+                  "type": "string"
+                 },
+                 "payment_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "interest_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 },
+                 "remaining_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                 }
+                },
+                "required": [
+                 "month",
+                 "date",
+                 "payment_minor",
+                 "interest_minor",
+                 "remaining_minor"
+                ],
+                "additionalProperties": false
+               }
+              }
+             },
+             "required": [
+              "strategy",
+              "feasible",
+              "priority_order",
+              "months_to_debt_free",
+              "debt_free_month",
+              "total_interest_minor",
+              "total_paid_minor",
+              "schedule_truncated"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "object",
+             "properties": {
+              "strategy": {
+               "type": "string",
+               "enum": [
+                "snowball",
+                "avalanche"
+               ]
+              },
+              "feasible": {
+               "type": "boolean",
+               "const": false
+              },
+              "reason": {
+               "type": "string",
+               "enum": [
+                "budget_below_minimums",
+                "not_paid_off_within_50_years"
+               ]
+              },
+              "minimum_budget_minor": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 10000000000000
+              }
+             },
+             "required": [
+              "strategy",
+              "feasible",
+              "reason",
+              "minimum_budget_minor"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "difference": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "interest_saved_by_avalanche_minor": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "months_saved_by_avalanche": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              }
+             },
+             "required": [
+              "interest_saved_by_avalanche_minor",
+              "months_saved_by_avalanche"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "snowball",
+          "avalanche",
+          "difference"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "emergency_fund": {
+       "type": "object",
+       "properties": {
+        "target_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "gap_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "months_covered": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "months_to_target": {
+         "anyOf": [
+          {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "target_reached_month": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "target_minor",
+        "gap_minor",
+        "months_covered",
+        "months_to_target",
+        "target_reached_month"
+       ],
+       "additionalProperties": false
+      },
+      "goals": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "goal_id": {
+          "type": "string"
+         },
+         "months_to_target": {
+          "anyOf": [
+           {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "target_reached_month": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "goal_id",
+         "months_to_target",
+         "target_reached_month"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "warnings": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string"
+         },
+         "severity": {
+          "type": "string",
+          "enum": [
+           "info",
+           "warn"
+          ]
+         },
+         "message": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "code",
+         "severity",
+         "message"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "scenarios": {
+       "type": "object",
+       "description": "Only when asked for and income varies; `monthly` then describes a lean month.",
+       "properties": {
+        "scenarios": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "scenario": {
+            "type": "string",
+            "enum": [
+             "lean",
+             "typical",
+             "good"
+            ]
+           },
+           "income_minor": {
+            "description": "Null when no figure is recorded for this kind of month. Do not estimate one.",
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "balance_minor": {
+            "description": "Income minus all outgoings. Negative is a shortfall.",
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "essentials_balance_minor": {
+            "description": "Income minus essentials and minimum debt payments only.",
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "goal_funding_minor": {
+            "description": "How much of the planned goal contributions such a month can pay for.",
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "scenario",
+           "income_minor",
+           "balance_minor",
+           "essentials_balance_minor",
+           "goal_funding_minor"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "break_even_minor": {
+         "type": "integer",
+         "description": "The income at which a month balances.",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "essentials_break_even_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "lean_months_covered": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Lean months the emergency fund makes up for; null when a lean month has no shortfall."
+        },
+        "lean_months_of_essentials_covered": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "basis": {
+         "type": "string",
+         "description": "declared: what the user said they expect, not measured.",
+         "enum": [
+          "declared"
+         ]
+        },
+        "omitted_spending_minor": {
+         "type": "integer",
+         "description": "Spending in the profile that the plan leaves out. The scenarios count it.",
+         "minimum": 0,
+         "maximum": 10000000000000
+        }
+       },
+       "required": [
+        "scenarios",
+        "break_even_minor",
+        "essentials_break_even_minor",
+        "lean_months_covered",
+        "lean_months_of_essentials_covered",
+        "basis",
+        "omitted_spending_minor"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "engine_version",
+      "start_month",
+      "monthly",
+      "debt",
+      "emergency_fund",
+      "goals",
+      "warnings"
+     ],
+     "additionalProperties": false
+    }
+   },
+   "required": [
+    "version",
+    "currency",
+    "results"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "log_check_in": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "period_start": {
+     "type": "string",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "period_end": {
+     "type": "string",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "actuals": {
+     "type": "object",
+     "properties": {
+      "income_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "spending": {
+       "type": "array",
+       "maxItems": 20,
+       "items": {
+        "type": "object",
+        "properties": {
+         "category": {
+          "type": "string",
+          "enum": [
+           "housing",
+           "utilities",
+           "food",
+           "transport",
+           "health",
+           "insurance",
+           "education",
+           "childcare",
+           "personal",
+           "entertainment",
+           "giving",
+           "other"
+          ]
+         },
+         "amount_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         }
+        },
+        "required": [
+         "category",
+         "amount_minor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "debt_payments_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "savings_added_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      }
+     },
+     "required": [
+      "income_minor",
+      "spending"
+     ],
+     "additionalProperties": false
+    },
+    "note": {
+     "type": "string",
+     "description": "Anything the user wants remembered about this period.",
+     "maxLength": 1000
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "period_start",
+    "period_end",
+    "actuals"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "check_in_id": {
+     "type": "string"
+    },
+    "variance": {
+     "description": "Null when there is no plan to compare with.",
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "period_days": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "spending": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "planned_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "actual_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "difference_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "category": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "planned_minor",
+           "actual_minor",
+           "difference_minor",
+           "category"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "income": {
+         "type": "object",
+         "properties": {
+          "planned_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "actual_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "difference_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "planned_minor",
+          "actual_minor",
+          "difference_minor"
+         ],
+         "additionalProperties": false
+        },
+        "debt_payments": {
+         "type": "object",
+         "properties": {
+          "planned_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "actual_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "difference_minor": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "planned_minor",
+          "actual_minor",
+          "difference_minor"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "required": [
+        "period_days",
+        "spending",
+        "income",
+        "debt_payments"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "check_in_id",
+    "variance"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "assign_lessons": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "lesson_slugs": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 5,
+     "items": {
+      "type": "string",
+      "maxLength": 80
+     }
+    },
+    "reason": {
+     "type": "string",
+     "description": "One or two sentences, addressed to the user, on why these lessons are relevant.",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "idempotency_key": {
+     "type": "string",
+     "description": "Any unique string you choose for this request; reuse it only when retrying the same request.",
+     "minLength": 8,
+     "maxLength": 100,
+     "pattern": "^[\\w.:-]+$"
+    }
+   },
+   "required": [
+    "lesson_slugs",
+    "reason"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "assigned": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "skipped": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "slug": {
+        "type": "string"
+       },
+       "why": {
+        "type": "string",
+        "enum": [
+         "unknown_lesson",
+         "already_assigned",
+         "already_completed",
+         "dismissed_by_user"
+        ]
+       }
+      },
+      "required": [
+       "slug",
+       "why"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "assigned",
+    "skipped"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "calc_budget": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "net_income_minor": {
+     "type": "integer",
+     "description": "Monthly take-home income.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "net_income_scenarios": {
+     "type": "object",
+     "description": "For an amount that varies from month to month, give this instead. Leave out a kind of month whose figure is not known. Replaces net_income_minor.",
+     "properties": {
+      "lean_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "typical_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "good_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      }
+     },
+     "required": [
+      "lean_minor"
+     ],
+     "additionalProperties": false
+    },
+    "expenses": {
+     "type": "array",
+     "description": "Monthly expenses. Essential ones count as needs, the rest as wants.",
+     "maxItems": 50,
+     "items": {
+      "type": "object",
+      "properties": {
+       "category": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "essential": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "category",
+       "amount_minor",
+       "essential"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "method": {
+     "anyOf": [
+      {
+       "type": "string",
+       "enum": [
+        "50_30_20",
+        "zero_based"
+       ]
+      },
+      {
+       "type": "object",
+       "description": "Must add up to 100.",
+       "properties": {
+        "needs_percent": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 100
+        },
+        "wants_percent": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 100
+        },
+        "savings_percent": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 100
+        }
+       },
+       "required": [
+        "needs_percent",
+        "wants_percent",
+        "savings_percent"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    }
+   },
+   "required": [
+    "expenses",
+    "method"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "net_income_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "total_expenses_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "surplus_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "shortfall_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "savings_rate_bps": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "buckets": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "bucket": {
+        "type": "string",
+        "enum": [
+         "needs",
+         "wants",
+         "savings"
+        ]
+       },
+       "target_minor": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "actual_minor": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "difference_minor": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "bucket",
+       "target_minor",
+       "actual_minor",
+       "difference_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "by_category": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "category": {
+        "type": "string"
+       },
+       "amount_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "share_of_income_bps": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "category",
+       "amount_minor",
+       "share_of_income_bps"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "scenarios": {
+     "type": "array",
+     "description": "Only when a varying amount was given: one result for each kind of month that is known. The main result is the lean one.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "scenario": {
+        "type": "string",
+        "enum": [
+         "lean",
+         "typical",
+         "good"
+        ]
+       },
+       "result": {
+        "type": "object",
+        "properties": {
+         "net_income_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "total_expenses_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "surplus_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "shortfall_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "savings_rate_bps": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         },
+         "buckets": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "bucket": {
+             "type": "string",
+             "enum": [
+              "needs",
+              "wants",
+              "savings"
+             ]
+            },
+            "target_minor": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "actual_minor": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "difference_minor": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "bucket",
+            "target_minor",
+            "actual_minor",
+            "difference_minor"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "by_category": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "category": {
+             "type": "string"
+            },
+            "amount_minor": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 10000000000000
+            },
+            "share_of_income_bps": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "category",
+            "amount_minor",
+            "share_of_income_bps"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "net_income_minor",
+         "total_expenses_minor",
+         "surplus_minor",
+         "shortfall_minor",
+         "savings_rate_bps",
+         "buckets",
+         "by_category"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "scenario",
+       "result"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "net_income_minor",
+    "total_expenses_minor",
+    "surplus_minor",
+    "shortfall_minor",
+    "savings_rate_bps",
+    "buckets",
+    "by_category"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "calc_debt_payoff": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "debts": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 50,
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "description": "Any label you choose, used to refer to this debt in the result.",
+        "minLength": 1,
+        "maxLength": 40
+       },
+       "balance_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "apr_bps": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100000
+       },
+       "minimum_payment_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       }
+      },
+      "required": [
+       "id",
+       "balance_minor",
+       "apr_bps",
+       "minimum_payment_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "monthly_budget_minor": {
+     "type": "integer",
+     "description": "Total available for debt each month, minimum payments included.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "monthly_budget_scenarios": {
+     "type": "object",
+     "description": "For an amount that varies from month to month, give this instead. Leave out a kind of month whose figure is not known. Replaces monthly_budget_minor. Each result assumes every month is of that kind.",
+     "properties": {
+      "lean_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "typical_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "good_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      }
+     },
+     "required": [
+      "lean_minor"
+     ],
+     "additionalProperties": false
+    },
+    "strategy": {
+     "type": "string",
+     "enum": [
+      "snowball",
+      "avalanche",
+      "both"
+     ]
+    },
+    "start_date": {
+     "type": "string",
+     "description": "First month, as a date. Defaults to the current month.",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "schedule_months": {
+     "type": "integer",
+     "description": "How many months of the payment schedule to return. Totals always cover the full payoff.",
+     "default": 24,
+     "minimum": 0,
+     "maximum": 120
+    }
+   },
+   "required": [
+    "debts",
+    "strategy"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "snowball": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "strategy": {
+         "type": "string",
+         "enum": [
+          "snowball",
+          "avalanche"
+         ]
+        },
+        "feasible": {
+         "type": "boolean",
+         "const": true
+        },
+        "priority_order": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "months_to_debt_free": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "debt_free_month": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "total_interest_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "total_paid_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "schedule_truncated": {
+         "type": "boolean"
+        },
+        "debts": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "paid_off_in_month": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "paid_off_month": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "interest_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           }
+          },
+          "required": [
+           "id",
+           "paid_off_in_month",
+           "paid_off_month",
+           "interest_minor"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "schedule": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "month": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "date": {
+            "type": "string"
+           },
+           "payment_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           "interest_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           "remaining_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           }
+          },
+          "required": [
+           "month",
+           "date",
+           "payment_minor",
+           "interest_minor",
+           "remaining_minor"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "strategy",
+        "feasible",
+        "priority_order",
+        "months_to_debt_free",
+        "debt_free_month",
+        "total_interest_minor",
+        "total_paid_minor",
+        "schedule_truncated",
+        "debts",
+        "schedule"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "strategy": {
+         "type": "string",
+         "enum": [
+          "snowball",
+          "avalanche"
+         ]
+        },
+        "feasible": {
+         "type": "boolean",
+         "const": false
+        },
+        "reason": {
+         "type": "string",
+         "enum": [
+          "budget_below_minimums",
+          "not_paid_off_within_50_years"
+         ]
+        },
+        "minimum_budget_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        }
+       },
+       "required": [
+        "strategy",
+        "feasible",
+        "reason",
+        "minimum_budget_minor"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    },
+    "avalanche": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "strategy": {
+         "type": "string",
+         "enum": [
+          "snowball",
+          "avalanche"
+         ]
+        },
+        "feasible": {
+         "type": "boolean",
+         "const": true
+        },
+        "priority_order": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "months_to_debt_free": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "debt_free_month": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "total_interest_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "total_paid_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        },
+        "schedule_truncated": {
+         "type": "boolean"
+        },
+        "debts": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "paid_off_in_month": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "paid_off_month": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "interest_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           }
+          },
+          "required": [
+           "id",
+           "paid_off_in_month",
+           "paid_off_month",
+           "interest_minor"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "schedule": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "month": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "date": {
+            "type": "string"
+           },
+           "payment_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           "interest_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           },
+           "remaining_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+           }
+          },
+          "required": [
+           "month",
+           "date",
+           "payment_minor",
+           "interest_minor",
+           "remaining_minor"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "strategy",
+        "feasible",
+        "priority_order",
+        "months_to_debt_free",
+        "debt_free_month",
+        "total_interest_minor",
+        "total_paid_minor",
+        "schedule_truncated",
+        "debts",
+        "schedule"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "strategy": {
+         "type": "string",
+         "enum": [
+          "snowball",
+          "avalanche"
+         ]
+        },
+        "feasible": {
+         "type": "boolean",
+         "const": false
+        },
+        "reason": {
+         "type": "string",
+         "enum": [
+          "budget_below_minimums",
+          "not_paid_off_within_50_years"
+         ]
+        },
+        "minimum_budget_minor": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 10000000000000
+        }
+       },
+       "required": [
+        "strategy",
+        "feasible",
+        "reason",
+        "minimum_budget_minor"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    },
+    "difference": {
+     "description": "Present for \"both\" when each strategy clears the debt. Positive numbers favour avalanche.",
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "interest_saved_by_avalanche_minor": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "months_saved_by_avalanche": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        }
+       },
+       "required": [
+        "interest_saved_by_avalanche_minor",
+        "months_saved_by_avalanche"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "scenarios": {
+     "type": "array",
+     "description": "Only when a varying amount was given: one result for each kind of month that is known. The main result is the lean one.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "scenario": {
+        "type": "string",
+        "enum": [
+         "lean",
+         "typical",
+         "good"
+        ]
+       },
+       "result": {
+        "type": "object",
+        "properties": {
+         "snowball": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "strategy": {
+              "type": "string",
+              "enum": [
+               "snowball",
+               "avalanche"
+              ]
+             },
+             "feasible": {
+              "type": "boolean",
+              "const": true
+             },
+             "priority_order": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "months_to_debt_free": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "debt_free_month": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "total_interest_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "total_paid_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "schedule_truncated": {
+              "type": "boolean"
+             },
+             "debts": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "id": {
+                 "type": "string"
+                },
+                "paid_off_in_month": {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                "paid_off_month": {
+                 "anyOf": [
+                  {
+                   "type": "string"
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                },
+                "interest_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                }
+               },
+               "required": [
+                "id",
+                "paid_off_in_month",
+                "paid_off_month",
+                "interest_minor"
+               ],
+               "additionalProperties": false
+              }
+             },
+             "schedule": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "month": {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                "date": {
+                 "type": "string"
+                },
+                "payment_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                },
+                "interest_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                },
+                "remaining_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                }
+               },
+               "required": [
+                "month",
+                "date",
+                "payment_minor",
+                "interest_minor",
+                "remaining_minor"
+               ],
+               "additionalProperties": false
+              }
+             }
+            },
+            "required": [
+             "strategy",
+             "feasible",
+             "priority_order",
+             "months_to_debt_free",
+             "debt_free_month",
+             "total_interest_minor",
+             "total_paid_minor",
+             "schedule_truncated",
+             "debts",
+             "schedule"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "object",
+            "properties": {
+             "strategy": {
+              "type": "string",
+              "enum": [
+               "snowball",
+               "avalanche"
+              ]
+             },
+             "feasible": {
+              "type": "boolean",
+              "const": false
+             },
+             "reason": {
+              "type": "string",
+              "enum": [
+               "budget_below_minimums",
+               "not_paid_off_within_50_years"
+              ]
+             },
+             "minimum_budget_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "strategy",
+             "feasible",
+             "reason",
+             "minimum_budget_minor"
+            ],
+            "additionalProperties": false
+           }
+          ]
+         },
+         "avalanche": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "strategy": {
+              "type": "string",
+              "enum": [
+               "snowball",
+               "avalanche"
+              ]
+             },
+             "feasible": {
+              "type": "boolean",
+              "const": true
+             },
+             "priority_order": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "months_to_debt_free": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "debt_free_month": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "total_interest_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "total_paid_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             },
+             "schedule_truncated": {
+              "type": "boolean"
+             },
+             "debts": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "id": {
+                 "type": "string"
+                },
+                "paid_off_in_month": {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                "paid_off_month": {
+                 "anyOf": [
+                  {
+                   "type": "string"
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                },
+                "interest_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                }
+               },
+               "required": [
+                "id",
+                "paid_off_in_month",
+                "paid_off_month",
+                "interest_minor"
+               ],
+               "additionalProperties": false
+              }
+             },
+             "schedule": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "month": {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                "date": {
+                 "type": "string"
+                },
+                "payment_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                },
+                "interest_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                },
+                "remaining_minor": {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 10000000000000
+                }
+               },
+               "required": [
+                "month",
+                "date",
+                "payment_minor",
+                "interest_minor",
+                "remaining_minor"
+               ],
+               "additionalProperties": false
+              }
+             }
+            },
+            "required": [
+             "strategy",
+             "feasible",
+             "priority_order",
+             "months_to_debt_free",
+             "debt_free_month",
+             "total_interest_minor",
+             "total_paid_minor",
+             "schedule_truncated",
+             "debts",
+             "schedule"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "object",
+            "properties": {
+             "strategy": {
+              "type": "string",
+              "enum": [
+               "snowball",
+               "avalanche"
+              ]
+             },
+             "feasible": {
+              "type": "boolean",
+              "const": false
+             },
+             "reason": {
+              "type": "string",
+              "enum": [
+               "budget_below_minimums",
+               "not_paid_off_within_50_years"
+              ]
+             },
+             "minimum_budget_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000000000000
+             }
+            },
+            "required": [
+             "strategy",
+             "feasible",
+             "reason",
+             "minimum_budget_minor"
+            ],
+            "additionalProperties": false
+           }
+          ]
+         },
+         "difference": {
+          "description": "Present for \"both\" when each strategy clears the debt. Positive numbers favour avalanche.",
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "interest_saved_by_avalanche_minor": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             "months_saved_by_avalanche": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             }
+            },
+            "required": [
+             "interest_saved_by_avalanche_minor",
+             "months_saved_by_avalanche"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "scenario",
+       "result"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "additionalProperties": false
+  }
+ },
+ "calc_emergency_fund": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "essential_monthly_minor": {
+     "type": "integer",
+     "description": "Monthly spending on essentials only.",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "target_months": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 60
+    },
+    "current_balance_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "monthly_contribution_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "start_date": {
+     "type": "string",
+     "description": "First month, as a date. Defaults to the current month.",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    }
+   },
+   "required": [
+    "essential_monthly_minor",
+    "target_months",
+    "current_balance_minor",
+    "monthly_contribution_minor"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "target_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "gap_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "months_covered": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "months_to_target": {
+     "anyOf": [
+      {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "target_reached_month": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "target_minor",
+    "gap_minor",
+    "months_covered",
+    "months_to_target",
+    "target_reached_month"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "calc_savings_projection": {
+  "input": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "starting_balance_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "monthly_contribution_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "monthly_contribution_scenarios": {
+     "type": "object",
+     "description": "For an amount that varies from month to month, give this instead. Leave out a kind of month whose figure is not known. Replaces monthly_contribution_minor. Each result assumes every month is of that kind.",
+     "properties": {
+      "lean_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "typical_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      },
+      "good_minor": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000
+      }
+     },
+     "required": [
+      "lean_minor"
+     ],
+     "additionalProperties": false
+    },
+    "annual_rate_bps": {
+     "type": "integer",
+     "description": "Annual interest rate in basis points: 450 = 4.5%.",
+     "minimum": 0,
+     "maximum": 100000
+    },
+    "months": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 600
+    },
+    "target_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "start_date": {
+     "type": "string",
+     "description": "First month, as a date. Defaults to the current month.",
+     "format": "date",
+     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    }
+   },
+   "required": [
+    "starting_balance_minor",
+    "annual_rate_bps",
+    "months"
+   ],
+   "additionalProperties": false
+  },
+  "output": {
+   "type": "object",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "properties": {
+    "final_balance_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "total_contributed_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "total_growth_minor": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 10000000000000
+    },
+    "months_to_target": {
+     "anyOf": [
+      {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "target_reached_month": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "series": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "month": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "date": {
+        "type": "string"
+       },
+       "balance_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "contributed_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       },
+       "growth_minor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10000000000000
+       }
+      },
+      "required": [
+       "month",
+       "date",
+       "balance_minor",
+       "contributed_minor",
+       "growth_minor"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "scenarios": {
+     "type": "array",
+     "description": "Only when a varying amount was given: one result for each kind of month that is known. The main result is the lean one.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "scenario": {
+        "type": "string",
+        "enum": [
+         "lean",
+         "typical",
+         "good"
+        ]
+       },
+       "result": {
+        "type": "object",
+        "properties": {
+         "final_balance_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "total_contributed_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "total_growth_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000000000
+         },
+         "months_to_target": {
+          "anyOf": [
+           {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "target_reached_month": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "series": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "month": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "date": {
+             "type": "string"
+            },
+            "balance_minor": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 10000000000000
+            },
+            "contributed_minor": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 10000000000000
+            },
+            "growth_minor": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 10000000000000
+            }
+           },
+           "required": [
+            "month",
+            "date",
+            "balance_minor",
+            "contributed_minor",
+            "growth_minor"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "final_balance_minor",
+         "total_contributed_minor",
+         "total_growth_minor",
+         "months_to_target",
+         "target_reached_month",
+         "series"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "scenario",
+       "result"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "final_balance_minor",
+    "total_contributed_minor",
+    "total_growth_minor",
+    "months_to_target",
+    "target_reached_month",
+    "series"
+   ],
+   "additionalProperties": false
+  }
+ }
+}

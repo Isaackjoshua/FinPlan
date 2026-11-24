@@ -26,13 +26,13 @@ const vary = (over: object): Item => ({ ...variableIncome, ...over }) as Item;
 
 describe('incomeBand', () => {
   it('treats fixed income as the same in every kind of month', () => {
-    expect(incomeBand([income])).toEqual({ varies: false, basis: 'declared', leanMinor: tzs(200_000), typicalMinor: tzs(200_000), goodMinor: tzs(200_000) });
+    expect(incomeBand([income])).toMatchObject({ varies: false, basis: 'declared', leanMinor: tzs(200_000), typicalMinor: tzs(200_000), goodMinor: tzs(200_000) });
     expect(incomeBand([])).toMatchObject({ varies: false, leanMinor: 0 });
   });
 
   it('adds sources up, and knows a total only when every source is known', () => {
     const salary = { ...income, id: 'salary', amountMinor: 120_000, frequency: 'yearly' } as Item;
-    expect(incomeBand([salary, vary({ typicalMinor: tzs(300_000), highMinor: tzs(500_000) })])).toEqual({
+    expect(incomeBand([salary, vary({ typicalMinor: tzs(300_000), highMinor: tzs(500_000) })])).toMatchObject({
       varies: true, basis: 'declared', leanMinor: tzs(200_000) + 10_000, typicalMinor: tzs(300_000) + 10_000, goodMinor: tzs(500_000) + 10_000,
     });
     expect(incomeBand([vary({ typicalMinor: tzs(300_000) }), vary({ id: 'other' })])).toMatchObject({ typicalMinor: null, goodMinor: null });
@@ -87,7 +87,7 @@ describe('planning on income that varies', () => {
 
   it('states the shortfall and its uncertainty rather than one surplus (grounding case)', () => {
     const r = plan(variableItems);
-    expect(r.engineVersion).toBe('1.1.0');
+    expect(r.engineVersion).toBe('1.2.0');
     expect(r.scenarios).toMatchObject({ basis: 'declared', omittedSpendingMinor: 0, breakEvenMinor: tzs(473_500) });
     expect(r.scenarios!.scenarios.map((s) => s.balanceMinor)).toEqual([tzs(-273_500), null, null]);
     expect(codes(r.warnings)).toEqual(['lean_month_shortfall', 'income_uncertain']);

@@ -1,4 +1,4 @@
-import { formatAmount, type ScenariosResult } from '@fin/core';
+import { formatAmount, type IncomeBasis, type ScenariosResult } from '@fin/core';
 
 const NAMES = { lean: 'Lean month', typical: 'Typical month', good: 'Good month' } as const;
 
@@ -27,10 +27,15 @@ export function ScenarioTable({ result, currency }: { result: ScenariosResult; c
 const months = (n: number) => `${n} lean ${n === 1 ? 'month' : 'months'}`;
 
 /** What it takes to balance, and how long the emergency fund lasts while months stay lean. */
-export function ScenarioNotes({ result, currency }: { result: ScenariosResult; currency: string }) {
+export function ScenarioNotes({ result, currency, basis = 'declared', monthsObserved = 0 }: { result: ScenariosResult; currency: string; basis?: IncomeBasis; monthsObserved?: number }) {
   const { breakEvenMinor, essentialsBreakEvenMinor, leanMonthsCovered, leanMonthsOfEssentialsCovered } = result;
   return (
     <div className="space-y-1">
+      {basis !== 'declared' && (
+        <p>
+          {basis === 'measured' ? `Measured from ${monthsObserved} months of check-ins.` : `What your profile does not say is filled in from ${monthsObserved} months of check-ins so far.`}
+        </p>
+      )}
       <p>
         A month has to bring in <span className="num font-medium">{formatAmount(breakEvenMinor, currency)}</span> to balance, or{' '}
         <span className="num font-medium">{formatAmount(essentialsBreakEvenMinor, currency)}</span> to cover essentials and minimum debt payments.
@@ -38,7 +43,7 @@ export function ScenarioNotes({ result, currency }: { result: ScenariosResult; c
       {leanMonthsCovered !== null && (
         <p>
           Your emergency fund makes up for {months(leanMonthsCovered)} in full
-          {leanMonthsOfEssentialsCovered !== null && <>, or {months(leanMonthsOfEssentialsCovered)} of essentials only</>}. How often lean months come is not known yet.
+          {leanMonthsOfEssentialsCovered !== null && <>, or {months(leanMonthsOfEssentialsCovered)} of essentials only</>}.{basis === 'declared' && ' How often lean months come is not known yet.'}
         </p>
       )}
     </div>

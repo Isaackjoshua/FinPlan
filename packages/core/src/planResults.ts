@@ -3,6 +3,8 @@ import {
   calcEmergencyFund,
   calcSavingsProjection,
   calcScenarios,
+  leanRunShortfall,
+  worstShortfall,
   compareDebtStrategies,
   ENGINE_VERSION,
   monthlyInterest,
@@ -11,10 +13,13 @@ import {
   type EmergencyFundResult,
   type ScenariosResult,
 } from '@fin/calc';
-import { incomeBand, type IncomeBand } from './income';
+import { effectiveGoals } from './funding';
+import type { IncomeHistory } from './history';
+import { incomeBand, withLeanIncome, type IncomeBand } from './income';
 import { toMonthly } from './money';
 import type { Goal, Item } from './profile';
 import type { PlanInputs } from './schemas';
+import { expensesOf, expenseTiers, type ExpenseTiers } from './spending';
 import { summarise } from './summary';
 import type { Warning } from './warnings';
 
@@ -46,12 +51,24 @@ export interface PlanResults {
   warnings: Warning[];
   /** Only when income varies; `monthly` then describes a lean month. */
   scenarios?: PlanScenarios;
+  /** What the emergency fund is and is not sized on, once expenses have been given tiers. */
+  spendingTiers?: ExpenseTiers;
+  /** The profile's revision when this was worked out, to tell when it has changed since. Absent from older versions. */
+  profileRevision?: number;
 }
 
 export interface PlanScenarios extends ScenariosResult {
   basis: IncomeBand['basis'];
   /** Spending in the profile that the plan leaves out. The scenarios count it, because it will still be spent. */
   omittedSpendingMinor: number;
+  monthsObserved: number;
+  /** What it takes to keep paying for essentials through lean months. */
+  leanRun: {
+    /** `measured`: the deepest hole observed months dug. `assumed`: as many lean months in a row as the plan's emergency fund is meant to last. */
+    basis: 'measured' | 'assumed';
+    months: number;
+    amountMinor: number;
+  };
 }
 
 /**
@@ -68,8 +85,34 @@ function omittedExpenses(items: Item[], inputs: PlanInputs) {
   });
 }
 
-export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInputs, startMonth: string): PlanResults {
-  const summary = summarise(items);
+/**
+ * The planned budget split into needs and wants by what the profile says is survival spending, so
+ * that a plan and its emergency fund agree. Used once expenses have been given tiers. A category
+ * the profile has nothing in falls back on the usual list.
+ */
+function byTier(items: Item[], inputs: PlanInputs) {
+  const planned = new Map<PlanInputs['budget'][number]['category'], number>();
+  for (const row of inputs.budget) planned.set(row.category, (planned.get(row.category) ?? 0) + row.amountMinor);
+  return [...planned].flatMap(([category, amountMinor]) => {
+    const row = { category, amountMinor };
+    const own = expensesOf(items).filter((e) => e.category === row.category);
+    if (own.length === 0) return [{ ...row, essential: ESSENTIAL_CATEGORIES.has(row.category) }];
+    const needs = Math.min(row.amountMinor, own.reduce((sum, e) => sum + (e.essential ? toMonthly(e.amountMinor, e.frequency) : 0), 0));
+    return [{ ...row, amountMinor: needs, essential: true }, { ...row, amountMinor: row.amountMinor - needs, essential: false }];
+  });
+}
+
+export interface PlanContext {
+  /** What check-ins show about income. */
+  history?: IncomeHistory;
+  profileRevision?: number;
+}
+
+export function computePlanResults(items: Item[], storedGoals: Goal[], inputs: PlanInputs, startMonth: string, { history, profileRevision }: PlanContext = {}): PlanResults {
+  const band = incomeBand(items, history);
+  const summary = withLeanIncome(summarise(items), band);
+  const goals = effectiveGoals(storedGoals, items);
+  const tiers = expenseTiers(items);
   const goalById = new Map(goals.map((g) => [g.id, g]));
   // Money can only be planned towards goals that exist and are still being pursued.
   const contributions = inputs.goalContributions.filter((c) => goalById.get(c.goalId)?.status === 'active');
@@ -86,18 +129,27 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
   const unallocated = summary.monthlyIncome - budgeted - debtPayments - toGoals;
 
   const omitted = omittedExpenses(items, inputs);
-  const band = incomeBand(items);
   const scenarios: PlanScenarios | undefined = band.varies ? planScenarios() : undefined;
 
   function planScenarios(): PlanScenarios {
+    const essentials = summary.monthlyEssentialExpenses + summary.monthlyDebtMinimums;
+    const measured = band.basis === 'measured' && history;
     const omittedSpendingMinor = omitted.reduce((sum, e) => sum + toMonthly(e.amountMinor, e.frequency), 0);
     return {
       basis: band.basis,
+      monthsObserved: band.monthsObserved,
+      leanRun: measured
+        ? { basis: 'measured', months: history.observed.length, amountMinor: worstShortfall(history.runs, essentials) }
+        : {
+            basis: 'assumed',
+            months: inputs.emergencyFundMonths,
+            amountMinor: leanRunShortfall({ leanIncomeMinor: band.leanMinor, outgoingsMinor: essentials, months: inputs.emergencyFundMonths }),
+          },
       omittedSpendingMinor,
       ...calcScenarios({
         income: band,
         outgoingsMinor: budgeted + omittedSpendingMinor + debtPayments + toGoals,
-        essentialOutgoingsMinor: summary.monthlyEssentialExpenses + summary.monthlyDebtMinimums,
+        essentialOutgoingsMinor: essentials,
         goalContributionsMinor: toGoals,
         bufferMinor: summary.emergencyFund,
       }),
@@ -160,7 +212,7 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
     },
     budget: calcBudget({
       netIncomeMinor: summary.monthlyIncome,
-      expenses: inputs.budget.map((row) => ({ ...row, essential: ESSENTIAL_CATEGORIES.has(row.category) })),
+      expenses: tiers.classified ? byTier(items, inputs) : inputs.budget.map((row) => ({ ...row, essential: ESSENTIAL_CATEGORIES.has(row.category) })),
       method: '50_30_20',
     }),
     debt,
@@ -185,5 +237,7 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
     }),
     warnings,
     ...(scenarios && { scenarios }),
+    ...(tiers.classified && { spendingTiers: tiers }),
+    ...(profileRevision !== undefined && { profileRevision }),
   };
 }

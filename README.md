@@ -12,8 +12,11 @@ The design, data model and milestones are in [docs/PLAN.md](docs/PLAN.md).
 | 1. Core platform (accounts, profile, goals, versioned plans, check-ins, dashboard) | Done |
 | 2. Calculation engine (budget, debt payoff, emergency fund, savings projection) | Done |
 | 3. Literacy module (lessons, quizzes, progress, suggestions) | Done |
-| 4. MCP server and OAuth (19 tools, read and write scopes, consent screen, rate limits, activity log) | Built and tested with the official MCP client and MCP Inspector. Still to do: connect Claude and ChatGPT by hand, which needs a public address |
+| 4. MCP server and OAuth (30 tools, read and write scopes, consent screen, rate limits, activity log) | Built and tested with the official MCP client and MCP Inspector. Still to do: connect Claude and ChatGPT by hand, which needs a public address |
 | 5. AI apps page (connect instructions, connected apps, disconnect, undo, activity log), data export, account deletion | Built and covered by the end-to-end script |
+
+Planning for income that varies (lean months, measured income, big bills, cash flow, sharing out
+money) is described in [docs/VARIABLE_INCOME.md](docs/VARIABLE_INCOME.md).
 
 ## Run it locally
 

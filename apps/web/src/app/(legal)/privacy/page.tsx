@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
 
       <h3>Your financial information</h3>
       <ul>
-        <li>What you or a connected AI app enter: income, expenses, debts, savings, goals, plan versions, check-ins and notes.</li>
+        <li>What you or a connected AI app enter: income, expenses, debts, savings, goals, plan versions, check-ins, money received, how you shared it out, what you can spend today, and notes.</li>
         <li>Your lesson progress and quiz answers.</li>
         <li>The country and currency you choose.</li>
       </ul>

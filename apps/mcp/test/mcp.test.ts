@@ -1,11 +1,11 @@
-import { authenticateToken, getUserKey, hashToken, listActivity, listGoals, listItems, listPlanVersions, openJson, revokeConnection, sealJson, setupProfile, setWarningAcknowledged, upsertItem, USER } from '@fin/core';
+import { authenticateToken, getUserKey, hashToken, listActivity, listGoals, listItems, listPlanVersions, openJson, revokeConnection, sealJson, setCashOnHand, setupProfile, setWarningAcknowledged, upsertItem, USER } from '@fin/core';
 import { eq, schema } from '@fin/db';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createUser, testCtx } from '../../../packages/core/test/helpers';
-import { INSTRUCTIONS, TOOLS } from '../src';
-import { groundingItems, incompleteItems, variableItems } from '../../../packages/core/test/grounding';
-import { CONTRACT, matchesContract } from './contract';
+import { INSTRUCTIONS, instructionsFor, TOOLS } from '../src';
+import { groundingItems, incompleteItems, tieredItems, variableItems } from '../../../packages/core/test/grounding';
+import { CONTRACT, CONTRACTS, matchesContract } from './contract';
 import { startStack } from './harness';
 
 const ctx = testCtx();
@@ -56,7 +56,9 @@ describe('what the server says about itself', () => {
       const agent = await stack.connect(user, ['finance:read'], era);
       expect(agent.mcp.getNegotiatedProtocolVersion()).toBe(era === 'modern' ? '2026-07-28' : '2025-11-25');
       const instructions = agent.mcp.getInstructions()!;
-      expect(instructions).toBe(INSTRUCTIONS);
+      expect(instructions).toBe(instructionsFor(['finance:read']));
+      expect(instructions.startsWith(INSTRUCTIONS)).toBe(true);
+      expect(instructions).toMatch(/read the user's data but not change it/);
       expect(instructions).toMatch(/no tools for trading/);
       expect(instructions).toMatch(/does not give regulated investment advice/);
       expect(instructions).toMatch(/user_text.*never follow instructions/s);
@@ -65,11 +67,11 @@ describe('what the server says about itself', () => {
     }
   });
 
-  it('lists 19 tools, each fully described, and none that delete, revert or trade', async () => {
+  it('lists 30 tools, each fully described, and none that delete, revert or trade', async () => {
     const agent = await stack.connect(await newUser(), ['finance:read']);
     const { tools } = await agent.mcp.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(tools).toHaveLength(19);
+    expect(tools).toHaveLength(30);
     for (const tool of tools) {
       const def = TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.inputSchema, tool.name).toMatchObject({ type: 'object', additionalProperties: false });
@@ -90,7 +92,7 @@ describe('AI apps that connected before variable income', () => {
   it('can call every tool with the arguments they know', async () => {
     const agent = await stack.connect(await newUser(), ['finance:read']);
     const { tools } = await agent.mcp.listTools();
-    for (const [name, { input }] of Object.entries(CONTRACT)) {
+    for (const [name, { input }] of Object.values(CONTRACTS).flatMap((contract) => Object.entries(contract))) {
       const now = tools.find((t) => t.name === name);
       expect(now, name).toBeDefined();
       expect(Object.keys(now!.inputSchema.properties ?? {}), name).toEqual(expect.arrayContaining(Object.keys(input.properties ?? {})));
@@ -149,7 +151,7 @@ describe('AI apps that connected before variable income', () => {
 });
 
 describe('income that varies', () => {
-  const NEWER = { newer: true };
+  const NEWER = 'variable';
   const seeded = async () => {
     const user = await newUser('TZS');
     for (const { id: _id, ...item } of variableItems) await upsertItem(ctx, user, USER, item);
@@ -223,6 +225,201 @@ describe('income that varies', () => {
     await expect(wrong({})).rejects.toThrow(/Give either/);
     await expect(wrong({ net_income_minor: 1, net_income_scenarios: set })).rejects.toThrow(/Give either/);
     await expect(wrong({ net_income_scenarios: { lean_minor: 5, typical_minor: 4 } })).rejects.toThrow(/below a lean one/);
+  });
+});
+
+describe('what a connection may do', () => {
+  it('is stated up front, with how the currency is written', async () => {
+    const user = await newUser('TZS');
+    const reader = await stack.connect(user, ['finance:read']);
+    expect(await reader.call('get_capabilities')).toEqual({
+      can_read: true,
+      can_write: false,
+      tools_needing_permission: TOOLS.filter((t) => t.kind === 'write').map((t) => t.name),
+      currency: { code: 'TZS', decimals: 2, one_thousand_minor: 100_000 },
+    });
+    // The tools are still listed, so that calling one can ask the user.
+    expect((await reader.mcp.listTools()).tools.map((t) => t.name)).toContain('update_profile');
+    const writer = await stack.connect(user, ['finance:write']);
+    const answer = await writer.call('get_capabilities');
+    expect(answer).toMatchObject({ can_read: false, can_write: true, currency: null }); // the currency is the user's data
+    expect(answer.tools_needing_permission).toContain('get_profile');
+    expect(instructionsFor(['finance:write'])).toMatch(/not read it/);
+    expect(instructionsFor(['finance:read', 'finance:write'])).toMatch(/read and change/);
+    expect((await (await stack.connect(await newUser('JPY'), ['finance:read'])).call('get_capabilities')).currency).toEqual({ code: 'JPY', decimals: 0, one_thousand_minor: 1000 });
+  });
+});
+
+describe('spending, bills and timing', () => {
+  const NEWER = 'newest';
+  const DAY = new Date().toISOString().slice(0, 10);
+  const seeded = async (scopes = ['finance:read', 'finance:write']) => {
+    const user = await newUser('TZS');
+    for (const { id: _id, ...item } of tieredItems) await upsertItem(ctx, user, USER, item);
+    return { user, agent: await stack.connect(user, scopes) };
+  };
+
+  it('shows what an emergency fund covers and what monthly totals spread out', async () => {
+    const { agent } = await seeded();
+    const { expense_details, obligations } = await agent.call('get_profile', { sections: ['expense_details', 'obligations'] }, NEWER);
+    expect(expense_details.tiers).toEqual({ survival_minor: 33_000_000, committed_minor: 14_350_000, discretionary_minor: 0, classified: true });
+    expect(expense_details.lines.filter((l: any) => l.smoothed)).toEqual([expect.objectContaining({ amount_minor: 25_500_000, frequency: 'quarterly', monthly_minor: 8_500_000, next_due_date: null })]);
+    expect(obligations).toMatchObject({ set_aside_minor: 8_500_000, bills: [{ steady_monthly_minor: 8_500_000, catch_up_monthly_minor: null, user_text: { label: 'rent' } }] });
+    const { results } = await agent.call('save_plan_version', { summary: 'P', budget: [], emergency_fund_months: 6, include: ['spending_tiers'] }, NEWER);
+    expect(results.emergency_fund.target_minor).toBe(198_000_000);
+    expect(results.spending_tiers.committed_minor).toBe(14_350_000);
+    const { plan } = await agent.call('get_current_plan', { include: ['status'] }, NEWER);
+    expect(plan.profile_changed_since).toBe(false);
+    expect((await agent.call('get_current_plan')).plan).not.toHaveProperty('profile_changed_since');
+  });
+
+  it('records when things are due, and takes it away again', async () => {
+    const { agent } = await seeded();
+    const { expenses, revision } = await agent.call('get_profile', { sections: ['expenses'] });
+    const rent = expenses.find((e: any) => e.user_text.label === 'rent');
+    const set = (over: object, at: number) => agent.call('update_profile', { expected_revision: at, items: [{ op: 'upsert', id: rent.id, item: { kind: 'expense', label: 'rent', amount_minor: rent.amount_minor, frequency: 'every_six_months', category: 'housing', essential: true, ...over } }] });
+    const bill = async () => (await agent.call('get_profile', { sections: ['obligations'] }, NEWER)).obligations.bills[0];
+    await set({ next_due_date: '2099-01-05', reserved_minor: 500_000 }, revision);
+    expect(await bill()).toMatchObject({ frequency: 'every_six_months', due_date: '2099-01-05', reserved_minor: 500_000, remaining_minor: 25_000_000 });
+    await set({ next_due_date: null, reserved_minor: null }, revision + 1);
+    expect(await bill()).toMatchObject({ due_date: null, reserved_minor: 0 });
+  });
+
+  it('measures income from check-ins, and leaves the profile to the user', async () => {
+    const { agent } = await seeded();
+    const log = (m: string, last: number, actuals: object) => agent.call('log_check_in', { period_start: `2026-${m}-01`, period_end: `2026-${m}-${last}`, actuals: { spending: [], ...actuals } });
+    await log('01', 31, { income_minor: 30_000_000 });
+    await log('02', 28, { income_minor: 0, no_income: true });
+    await log('03', 31, { income_minor: 0 });
+    await log('04', 29, { income_minor: 5 });
+    const { income_plan, summary } = await agent.call('get_profile', { sections: ['income_plan', 'summary'] }, NEWER);
+    expect(income_plan).toMatchObject({ basis: 'declared', months_observed: 2, lean_minor: 0, typical_minor: null, declared: { lean_minor: 20_000_000 } });
+    expect(income_plan.observed).toEqual([{ month: '2026-01', total_minor: 30_000_000 }, { month: '2026-02', total_minor: 0 }]);
+    expect(income_plan.excluded).toEqual([{ month: '2026-03', reason: 'income_not_stated' }, { month: '2026-04', reason: 'gap' }]);
+    expect(summary.warnings.map((w: any) => w.code)).toContain('income_below_declared');
+    // `income_band` goes on saying what was declared, in the shape it was released with.
+    expect((await agent.call('get_profile', { sections: ['income_band'] }, 'variable')).income_band).toMatchObject({ basis: 'declared', lean_minor: 20_000_000, results: { break_even_minor: 47_350_000 } });
+    for (const m of ['05', '07', '08', '10']) await log(m, 31, { income_minor: 30_000_000 });
+    await log('06', 30, { income_minor: 40_000_000 });
+    const include = ['scenarios', 'planning'];
+    const { results } = await agent.call('save_plan_version', { summary: 'P', budget: [], include }, NEWER);
+    expect(results.planning).toMatchObject({ basis: 'measured', months_observed: 7, lean_run: { basis: 'measured' } });
+    expect(results).not.toHaveProperty('scenarios'); // not as declared, so not in the older form
+    await agent.call('save_plan_version', { summary: 'P', budget: [], include: ['scenarios'] }, 'variable');
+    await agent.call('get_current_plan', { include: ['scenarios'] }, 'variable');
+    expect((await agent.call('get_profile', { sections: ['income_plan'] }, NEWER)).income_plan.basis).toBe('measured');
+    // Apps that connected earlier get the figures in the shape they know.
+    expect((await agent.call('get_profile')).summary.monthly_income_minor).toBe(0);
+    expect((await agent.call('list_check_ins')).check_ins).toHaveLength(9);
+    expect((await agent.call('get_profile', { sections: ['income'] })).income[0].amount_minor).toBe(20_000_000);
+  });
+
+  it('logs money as it comes, and follows a balance from it', async () => {
+    const { user, agent } = await seeded();
+    const { income_id } = await agent.call('log_income', { received_on: DAY, amount_minor: 700, source: 'Client' });
+    expect(await agent.call('list_income')).toEqual({ currency: 'TZS', total_minor: 700, income: [{ id: income_id, received_on: DAY, amount_minor: 700, item_id: null, logged_by: 'agent', user_text: { source: 'Client' } }] });
+    expect((await agent.call('list_income', { since: '2099-01-01' })).income).toEqual([]);
+
+    await expect(agent.call('get_cash_flow')).rejects.toThrow(/Ask the user/);
+    const flow = await agent.call('get_cash_flow', { opening_balance_minor: 5_000 });
+    expect(flow).toMatchObject({ scenario: 'lean', opening_minor: 5_000, opening_as_of: null, end_minor: 5_000, partial: true });
+    expect(flow.undated).toHaveLength(9);
+    await setCashOnHand(ctx, user, { amountMinor: 900, asOf: '2026-01-01' });
+    expect(await agent.call('get_cash_flow')).toMatchObject({ opening_minor: 900, opening_as_of: '2026-01-01' });
+    await expect(agent.call('get_cash_flow', { scenario: 'typical' })).rejects.toThrow(/not known/);
+  });
+
+  it('works out and proposes how to share money, which only the user can confirm', async () => {
+    const { agent } = await seeded();
+    const { goal_id } = await agent.call('create_goal', { kind: 'other', title: 'Desk', target_amount_minor: 900, monthly_cap_minor: 400, funding_order: 1 });
+    const preview = await agent.call('preview_allocation', { available_minor: 50_000_000 });
+    expect(preview.lines.map((l: any) => l.group)).toEqual([...Array(4).fill('survival'), 'set_aside', ...Array(3).fill('committed'), 'goal']);
+    expect(preview.lines.at(-1)).toEqual({ group: 'goal', id: goal_id, wanted_minor: 400, allocated_minor: 400, unmet_minor: 0 });
+    expect((await agent.call('list_allocations')).allocations).toEqual([]);
+    const { allocation_id, status, ...plan } = await agent.call('record_allocation', { available_minor: 50_000_000 });
+    expect(status).toBe('proposed');
+    expect(plan).toEqual(preview);
+    expect((await agent.call('list_allocations')).allocations).toEqual([expect.objectContaining({ id: allocation_id, status: 'proposed', made_by: 'agent', left_minor: preview.left_minor })]);
+    expect((await agent.call('list_goals')).goals[0].current_amount_minor).toBe(0);
+    expect(TOOLS.map((t) => t.name).filter((name) => /confirm|discard/.test(name))).toEqual([]);
+  });
+
+  it('checks goals against what is left over, and totals their parts', async () => {
+    const { agent } = await seeded();
+    const include = ['feasibility', 'parts'];
+    const parts = [{ label: 'Case', amount_minor: 20_000_000 }, { label: 'Battery', amount_minor: 15_000_000 }, { label: 'Monitor', amount_minor: 20_000_000 }];
+    const made = await agent.call('create_goal', { kind: 'purchase', title: 'Equipment', parts, target_date: '2099-12-31', include }, NEWER);
+    expect(made).toMatchObject({ target_amount_minor: 55_000_000, feasibility: { verdict: 'unreachable' } });
+    expect(made.parts[0]).toEqual({ amount_minor: 20_000_000, done: false, user_text: { label: 'Case' } });
+    const [listed] = (await agent.call('list_goals', { include: [...include, 'funding'] }, NEWER)).goals;
+    expect(listed).toMatchObject({ target_amount_minor: 55_000_000, funding: { funding_order: null, monthly_cap_minor: null, savings_item_id: null }, feasibility: { verdict: 'unreachable', scenarios: [{ scenario: 'lean', enough: false }, { enough: null }, { enough: null }] } });
+    expect((await agent.call('get_profile')).summary.warnings.map((w: any) => w.code)).toContain('goal_unreachable');
+    // An app that knows nothing of parts gets the goal it knows, and cannot quietly break the total.
+    expect((await agent.call('list_goals')).goals[0]).not.toHaveProperty('parts');
+    await expect(agent.call('update_goal', { goal_id: made.goal_id, target_amount_minor: 5 })).rejects.toThrow(/parts/);
+    await agent.call('update_goal', { goal_id: made.goal_id, title: 'Kit' });
+    await expect(agent.call('create_goal', { kind: 'other', title: 'No target' })).rejects.toThrow(/target_amount_minor/);
+  });
+
+  it('reads plans saved by the release before this one', async () => {
+    const { user, agent } = await seeded();
+    await agent.call('save_plan_version', { summary: 'P', budget: [] });
+    const key = await getUserKey(ctx, user);
+    const [first] = await ctx.db.select().from(schema.planVersions).where(eq(schema.planVersions.userId, user));
+    const stored = openJson<any>(key, `plan_versions:${user}:${first!.id}`, first!.data);
+    for (const added of ['monthsObserved', 'leanRun']) delete stored.results.scenarios[added];
+    for (const added of ['profileRevision', 'spendingTiers']) delete stored.results[added];
+    const id = crypto.randomUUID();
+    await ctx.db.insert(schema.planVersions).values({ ...first!, id, versionNumber: 2, data: sealJson(key, `plan_versions:${user}:${id}`, stored) });
+    expect((await agent.call('get_plan_version', { version: 2, include: ['scenarios'] }, 'variable')).plan.results.scenarios.basis).toBe('declared');
+    const { plan } = await agent.call('get_plan_version', { version: 2, include: ['planning', 'spending_tiers', 'status'] }, NEWER);
+    expect(plan).toMatchObject({ profile_changed_since: null, results: { planning: { months_observed: null, lean_run: null } } });
+  });
+
+  it('tells a connection that may only write nothing but that it wrote', async () => {
+    const { agent } = await seeded(['finance:write']);
+    expect(Object.keys(await agent.call('record_allocation', { available_minor: 50_000_000 })).sort()).toEqual(['allocation_id', 'status']);
+    const goal = { kind: 'other', title: 'Desk', target_amount_minor: 900 };
+    await expect(agent.call('create_goal', { ...goal, include: ['feasibility'] })).rejects.toThrow(/permission to read/);
+    const { goal_id } = await agent.call('create_goal', goal);
+    await expect(agent.call('update_goal', { goal_id, title: 'X', include: ['parts'] })).rejects.toThrow(/permission to read/);
+  });
+
+  it('adds up what is larger than one amount may be', async () => {
+    const agent = await stack.connect(await newUser(), ['finance:read']);
+    expect((await agent.call('calc_totals', { lines: [{ id: 'a', amount_minor: 1e13, frequency: 'weekly' }] })).yearly_minor).toBe(5.2e14);
+    const fund = { essential_monthly_minor: 1e12, target_months: 1, current_balance_minor: 0, monthly_contribution_minor: 0 };
+    expect((await agent.call('calc_emergency_fund', { ...fund, volatility: { lean_income_minor: 0, lean_months: 60 } }, NEWER)).volatility.target_minor).toBe(6e13);
+  });
+
+  it('needs the right permission for each', async () => {
+    const { agent } = await seeded(['finance:read']);
+    await refused(() => agent.call('log_income', { received_on: DAY, amount_minor: 5 }));
+    await refused(() => agent.call('record_allocation', { available_minor: 5 }));
+    const writer = (await seeded(['finance:write'])).agent;
+    for (const [name, args] of [['list_income', {}], ['get_cash_flow', { opening_balance_minor: 1 }], ['preview_allocation', { available_minor: 1 }], ['list_allocations', {}]] as const) await refused(() => writer.call(name, args));
+  });
+
+  it('keeps one user\'s money out of another\'s answers', async () => {
+    const { agent } = await seeded();
+    await agent.call('log_income', { received_on: DAY, amount_minor: 700 });
+    await agent.call('record_allocation', { available_minor: 5 });
+    const other = (await seeded()).agent;
+    expect((await other.call('list_income')).income).toEqual([]);
+    expect((await other.call('list_allocations')).allocations).toEqual([]);
+  });
+
+  it('has a calculator for each, so that no app has to add up', async () => {
+    const agent = await stack.connect(await newUser(), ['finance:read']);
+    const totals = await agent.call('calc_totals', { lines: [{ id: 'rent', amount_minor: 25_500_000, frequency: 'quarterly' }, { id: 'food', amount_minor: 16_000_000, frequency: 'monthly', group: 'f' }] });
+    expect(totals).toMatchObject({ monthly_minor: 24_500_000, lines: [{ monthly_minor: 8_500_000 }, {}], groups: [{ group: 'f', monthly_minor: 16_000_000 }] });
+    expect(await agent.call('calc_sinking_fund', { amount_minor: 25_500_000, frequency: 'quarterly', next_due_date: '2027-01-05', start_date: '2026-11-24' })).toMatchObject({ steady_monthly_minor: 8_500_000, catch_up_monthly_minor: 12_750_000, months_left: 2 });
+    await expect(agent.call('calc_sinking_fund', { amount_minor: 5, frequency: 'monthly' })).rejects.toThrow(/less often/);
+    expect(await agent.call('calc_cash_flow', { opening_balance_minor: 10, start_date: '2026-11-01', days: 30, events: [{ id: 'a', date: '2026-11-05', amount_minor: -30 }, { id: 'b', date: '2026-11-20', amount_minor: 100 }] })).toMatchObject({ end_minor: 80, lowest: { date: '2026-11-05', balance_minor: -20 }, first_short_date: '2026-11-05' });
+    expect(await agent.call('calc_allocation', { available_minor: 10, steps: [{ id: 'a', need_minor: 8, cap_minor: 6 }, { id: 'b', need_minor: 9 }] })).toMatchObject({ left_minor: 0, first_unmet_id: 'b', lines: [{ allocated_minor: 6 }, { allocated_minor: 4 }] });
+    const fund = { essential_monthly_minor: 33_000_000, target_months: 6, current_balance_minor: 30_000_000, monthly_contribution_minor: 0 };
+    expect(await agent.call('calc_emergency_fund', { ...fund, volatility: { lean_income_minor: 20_000_000, lean_months: 3 } }, NEWER)).toMatchObject({ target_minor: 198_000_000, volatility: { basis: 'assumed', target_minor: 39_000_000, gap_minor: 9_000_000 } });
+    expect((await agent.call('calc_emergency_fund', { ...fund, volatility: { monthly_incomes_minor: [40_000_000, 25_000_000, 20_000_000, 60_000_000] } }, NEWER)).volatility).toEqual({ basis: 'measured', target_minor: 21_000_000, gap_minor: 0 });
   });
 });
 
@@ -402,7 +599,7 @@ describe('the core loop, as an agent would run it', () => {
 
     // Everything above is in the activity log, by name only.
     const log = await listActivity(ctx, user, { limit: 200 });
-    expect(new Set(log.map((row) => row.tool))).toEqual(new Set(TOOLS.map((t) => t.name)));
+    expect(new Set(log.map((row) => row.tool))).toEqual(new Set(Object.keys(CONTRACT)));
     expect(log.every((row) => row.outcome === 'ok' && row.connectionId === connectionId)).toBe(true);
     const planRow = log.find((row) => row.tool === 'save_plan_version')!;
     expect(planRow).toMatchObject({ requiredScope: 'finance:write', entityType: 'plan_version', entityId: '2' });
@@ -667,6 +864,8 @@ describe('privacy', () => {
       await agent.call('create_goal', { kind: 'other', title: 'SENTINEL-TITLE-7319', target_amount_minor: SENTINEL });
       await agent.call('save_plan_version', { summary: 'SENTINEL-SUMMARY-7319', budget: [{ category: 'food', amount_minor: SENTINEL }] });
       await agent.call('log_check_in', { period_start: '2026-01-01', period_end: '2026-01-31', actuals: { income_minor: SENTINEL, spending: [] }, note: 'SENTINEL-CHECKIN-7319' });
+      await agent.call('log_income', { received_on: '2026-01-05', amount_minor: SENTINEL, source: 'SENTINEL-SOURCE-7319' });
+      await agent.call('record_allocation', { available_minor: SENTINEL });
       await agent.mcp.callTool({ name: 'create_goal', arguments: { kind: 'other', title: 'SENTINEL-BAD-7319', target_amount_minor: -SENTINEL } });
       await agent.call('calc_budget', { net_income_minor: SENTINEL, expenses: [], method: 'zero_based' });
 

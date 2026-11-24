@@ -10,7 +10,7 @@ import {
   type AuthInfo,
 } from '@modelcontextprotocol/server';
 import { Hono } from 'hono';
-import { INSTRUCTIONS } from './instructions';
+import { instructionsFor } from './instructions';
 import { TOOL_BY_NAME, TOOLS, type ToolAuth, type ToolDef, type Touched } from './tools';
 import { explain, fit, portable } from './wire';
 
@@ -51,7 +51,7 @@ export function createMcpApp(options: McpAppOptions) {
   const limits = { ...DEFAULT_LIMITS, ...options.limits };
   const resource = new URL(options.mcpUrl);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(resource);
-  const deps = { ctx, appUrl: options.appUrl.replace(/\/$/, '') };
+  const deps = { ctx, appUrl: options.appUrl.replace(/\/$/, ''), scopeOf: () => Object.fromEntries(TOOLS.map((def) => [def.name, def.scope])) };
 
   async function record(state: RequestState, def: ToolDef | undefined, tool: string, outcome: ActivityOutcome, started: number, touched?: Touched) {
     state.logged.add(tool);
@@ -73,7 +73,7 @@ export function createMcpApp(options: McpAppOptions) {
 
   /** A fresh server per request, already bound to the caller. Nothing is shared between users. */
   function buildServer(state: RequestState): McpServer {
-    const server = new McpServer({ name: 'finplan', title: 'FinPlan', version: '1.0.0' }, { instructions: INSTRUCTIONS });
+    const server = new McpServer({ name: 'finplan', title: 'FinPlan', version: '1.0.0' }, { instructions: instructionsFor(state.scopes) });
     for (const def of TOOLS) {
       const scope = def.scope;
       server.registerTool(

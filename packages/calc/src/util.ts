@@ -6,9 +6,11 @@
  */
 
 /** Bump when any calculation changes, so saved plans record which rules produced them. */
-export const ENGINE_VERSION = '1.1.0';
+export const ENGINE_VERSION = '1.2.0';
 
 export const MAX_AMOUNT = 1e13;
+/** Sums of many amounts may pass the limit for one; they only have to stay exact. */
+export const MAX_TOTAL = Number.MAX_SAFE_INTEGER;
 export const MAX_RATE_BPS = 100_000;
 export const MAX_MONTHS = 600;
 

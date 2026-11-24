@@ -1,8 +1,8 @@
 import { Empty, Flash, humanise, PageHeader } from '@/components/ui';
-import { run, str } from '@/lib/forms';
+import { run, str, today } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
-import { checkProfile, dismissAssignment, getLessonStates, listItems, listLessons, recommendLessons, TOPICS, type Lesson, type LessonState } from '@fin/core';
+import { dismissAssignment, getLessonStates, listLessons, loadProfileCheck, recommendLessons, TOPICS, type Lesson, type LessonState } from '@fin/core';
 import Link from 'next/link';
 
 export const metadata = { title: 'Lessons' };
@@ -39,11 +39,10 @@ export default async function LessonsPage({ searchParams }: { searchParams: Prom
   const { userId, profile } = await requireProfile();
   const ctx = getCtx();
   const params = await searchParams;
-  const [states, items] = await Promise.all([getLessonStates(ctx, userId), listItems(ctx, userId)]);
+  const [states, { summary, warnings }] = await Promise.all([getLessonStates(ctx, userId), loadProfileCheck(ctx, userId, profile, today())]);
 
   const all = listLessons();
   const assigned = all.filter((l) => states.get(l.slug)?.assignment?.status === 'assigned');
-  const { summary, warnings } = checkProfile(items, profile.acknowledgedWarnings);
   const completed = new Set([...states].filter(([, s]) => s.status === 'completed').map(([slug]) => slug));
   const assignedSlugs = new Set(assigned.map((l) => l.slug));
   const recommended = recommendLessons(summary, warnings, completed).filter((l) => !assignedSlugs.has(l.slug));

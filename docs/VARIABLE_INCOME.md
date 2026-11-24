@@ -1,6 +1,6 @@
 # Variable income: findings, proposed changes and plan
 
-Status: **slices 1 and 2 are built; slices 3 to 9 are not started.** Findings were checked against commit
+Status: **all nine slices are built.** Findings were checked against commit
 `9b80935`, before slice 1, where all 179 tests passed; line numbers refer to it. Figures marked *reproduced* come from running the real functions
 on the grounding case.
 
@@ -84,7 +84,7 @@ Items, goals and plans are encrypted JSON, so most additions need **no SQL migra
 | Plan results: `scenarios?`, `profileRevision?` (N10). Old versions simply lack them | plan JSON | No |
 | `check_ins.voided_at` (N5) | nullable column | **Yes, M1** |
 | `income_actuals`: month in clear text, amount and source encrypted, optional check-in, `voided_at` | new table | **Yes, M2** |
-| `allocations`: month in clear text, lines encrypted, profile revision, `voided_at` | new table | **Yes, M3** |
+| `allocations`: month in clear text, lines encrypted, `confirmed_at`, `voided_at` | new table | **Yes, M3** |
 
 Both new tables delete with the account and join the data export. The month in clear text matches what
 `check_ins` already does.
@@ -96,10 +96,12 @@ classifies a line; a nudge points at `personal` and `entertainment` lines marked
 
 **`monthly_surplus_minor`.** Stays a plain number, floor-based. The band sits beside it.
 
-**Reversibility.** Every migration is additive and gets a paired down script, tested up, down, up. Ordinary
+**Reversibility.** Every migration is additive and has a paired down script in `packages/db/migrations/down`, tested up, down, up. Ordinary
 rollback is redeploying older code and leaving the unused column or table. Running a down script on a table
 **deletes its rows**, so it needs a backup first. Code must not be rolled back past slice 1 once new fields
-are stored, and older web forms would drop new fields from any item they save.
+are stored, and older web forms would drop new fields from any item they save. Two more limits on going
+back past slice 3: older code cannot add up a six-monthly bill (its totals stop being numbers), and it counts
+check-ins that were taken back. Change such bills to yearly first.
 
 ### Measuring income
 
@@ -137,19 +139,19 @@ empty budget still shows the shortfall. With variable income `spending_exceeds_i
 
 | Tool | Change | Version risk |
 |---|---|---|
-| `get_profile` | New sections: `income_band`, `completeness` (built); `line_details`, `obligations`, `cash_flow` | None, opt-in |
+| `get_profile` | New sections: `income_band` (declared), `income_plan` (what to plan on, measured included), `completeness`, `expense_details`, `obligations` | None, opt-in |
 | `update_profile` | Optional new item fields | None |
-| `save_plan_version`, `get_current_plan`, `get_plan_version` | `include: ['scenarios']`. New warnings always: `lean_month_shortfall`, `income_uncertain`, `plan_omits_expenses` | None, opt-in |
-| `create_goal`, `update_goal`, `list_goals` | Optional new fields; `include: ['feasibility', 'parts']`. Also a `goal_unreachable` warning in `get_profile` | None, opt-in |
+| `save_plan_version`, `get_current_plan`, `get_plan_version` | `include`: `planning`, `scenarios` (its older form, declared figures only), `spending_tiers`, `status`. New warnings always: `lean_month_shortfall`, `income_uncertain`, `plan_omits_expenses` | None, opt-in |
+| `create_goal`, `update_goal`, `list_goals` | Optional new fields; `include`: `funding`, `feasibility`, `parts`. Also a `goal_unreachable` warning in `get_profile` | None, opt-in |
 | `calc_budget`, `calc_savings_projection`, `calc_debt_payoff` | Optional `scenarios` input in place of the scalar; the result names which ran | None, opt-in |
 | `calc_emergency_fund` | Optional `volatility` mode | None, opt-in |
 | `log_check_in` | Wording fix and the void rule; explicit "no income this month" flag | None |
 | New: `calc_totals`, `calc_sinking_fund`, `calc_cash_flow`, `calc_allocation` | Pure calculators | None, additive |
 | New: `get_capabilities` | Granted permissions and, with read access, currency decimals plus a worked example (N11). Also stated in the per-connection instructions | None, additive |
-| New: `record_allocation` | Write tool, undoable | None, additive |
+| New: `get_cash_flow`, `preview_allocation`, `list_allocations`, `list_income` | Read tools | None, additive |
+| New: `log_income`, `record_allocation` | Write tools. The user can take either back, and only the user can confirm an allocation | None, additive |
 
-The engine version is `1.0.1` after slice 1 and is `1.1.0` from slice 2. The count of 19 tools in the
-tests changes when tools are added.
+The engine version is `1.0.1` after slice 1, `1.1.0` after slice 2 and `1.2.0` after the rest. There are 30 tools.
 
 ### The calculators
 
@@ -222,6 +224,26 @@ internet/data `committed`, the other five lines `survival`.
 | Goal parts 200,000 + 150,000 + 200,000 | Server total 550,000 | 9 |
 
 The calculation package keeps its 100% coverage rule.
+
+### Choices made while building slices 3 to 9
+
+- **Other spending comes last in the waterfall**, after goals. The approved order did not place it.
+- **A measured figure only fills gaps** while provisional, and never goes past a declared figure around it.
+- **Needs and wants in a plan follow the tiers only once something has a tier**, so untouched profiles keep
+  their numbers.
+- **The cash flow has its own tool and page**, because it needs an opening balance, which the user records.
+- **An allocation is refused once the profile, a goal or anything shared out has changed** since it was
+  worked out.
+- **Each release's tool list is frozen** in `apps/mcp/test/contract`, and every test answer is checked against
+  those it must satisfy. The first release of variable income went live before measured income, so measured
+  figures have names of their own (`income_plan`, `planning`).
+- **Undoing a change that an allocation was part of takes the allocation back too**, and redoing puts it back.
+- **A part of a goal can be ticked as done; that changes no amount.**
+- **A big bill whose date passes unmarked is taken as paid** from what was set aside, and this is said wherever
+  it matters.
+- **Dates that are stepped through must fall between 1900 and 2200.** A check-in dated 9999 could otherwise
+  stall the server.
+- **Fixed income is never adjusted by check-ins.** If they show much less, the user is told.
 
 ## 4. Decisions (24 November 2026)
 

@@ -1,6 +1,20 @@
-import { calcBudget, calcDebtPayoff, calcEmergencyFund, calcSavingsProjection, compareDebtStrategies, knownScenarios } from '@fin/calc';
+import {
+  calcAllocation,
+  calcBudget,
+  calcCashFlow,
+  calcDebtPayoff,
+  calcEmergencyFund,
+  calcSavingsProjection,
+  calcSinkingFund,
+  calcTotals,
+  compareDebtStrategies,
+  knownScenarios,
+  leanRunShortfall,
+  worstShortfall,
+} from '@fin/calc';
+import { lumpyMonths, PER_YEAR } from '@fin/core';
 import { z } from 'zod';
-import { ASSUMPTIONS, bps, budgetResult, emergencyFundResult, isoDate, minor, MINOR_NOTE, orNull, payoffDifference, payoffResult, POSITIONING, scenarioName, toCamel, ToolError, toSnake } from '../wire';
+import { ASSUMPTIONS, bps, budgetResult, emergencyFundResult, frequency, isoDate, minor, MINOR_NOTE, orNull, payoffDifference, payoffResult, POSITIONING, scenarioName, signedMinor, toCamel, totalMinor, ToolError, toSnake } from '../wire';
 import { tool } from './define';
 
 // These tools take explicit numbers, read nothing about the user and store nothing.
@@ -93,10 +107,34 @@ const calcEmergencyFundTool = tool({
     current_balance_minor: minor,
     monthly_contribution_minor: minor,
     start_date: startDate,
+    volatility: z
+      .union([
+        z.strictObject({ lean_income_minor: minor, lean_months: z.number().int().min(1).max(60) }).describe('A lean month and how many of them in a row to be ready for.'),
+        z.strictObject({ monthly_incomes_minor: z.array(minor).min(1).max(60) }).describe('Actual income of consecutive months, oldest first.'),
+      ])
+      .optional()
+      .describe('For income that varies: also works out what it takes to keep paying for essentials through lean months.'),
   }),
-  output: emergencyFundResult,
-  async run({ start_date, ...rest }) {
-    return { result: toSnake(calcEmergencyFund({ ...toCamel(rest), startDate: start_date ?? thisMonth() })) };
+  output: emergencyFundResult.extend({
+    volatility: z
+      .strictObject({ basis: z.enum(['assumed', 'measured']), target_minor: totalMinor, gap_minor: totalMinor })
+      .optional()
+      .describe('Only when asked for. Shown beside the months-of-essentials target, not added to it.'),
+  }),
+  async run({ start_date, volatility, ...rest }) {
+    const result = toSnake(calcEmergencyFund({ ...toCamel(rest), startDate: start_date ?? thisMonth() }));
+    if (!volatility) return { result };
+    const essentials = rest.essential_monthly_minor;
+    const target =
+      'lean_months' in volatility
+        ? leanRunShortfall({ leanIncomeMinor: volatility.lean_income_minor, outgoingsMinor: essentials, months: volatility.lean_months })
+        : worstShortfall([volatility.monthly_incomes_minor], essentials);
+    return {
+      result: {
+        ...result,
+        volatility: { basis: 'lean_months' in volatility ? 'assumed' : 'measured', target_minor: target, gap_minor: Math.max(0, target - rest.current_balance_minor) },
+      } as never,
+    };
   },
 });
 
@@ -131,4 +169,101 @@ const calcSavingsProjectionTool = tool({
   },
 });
 
-export const calcTools = [calcBudgetTool, calcDebtPayoffTool, calcEmergencyFundTool, calcSavingsProjectionTool];
+const calcTotalsTool = tool({
+  name: 'calc_totals',
+  title: 'Add up amounts',
+  kind: 'calc',
+  scope: null,
+  description: `Add up a list of amounts that come at different intervals. Returns what each comes to in an average month and in a year, totals per group, and grand totals. ${NOTE}`,
+  input: z.strictObject({
+    lines: z.array(z.strictObject({ id: z.string().min(1).max(40).describe('Any label you choose.'), amount_minor: minor, frequency, group: z.string().min(1).max(40).optional() })).min(1).max(100),
+  }),
+  output: z.strictObject({
+    lines: z.array(z.strictObject({ id: z.string(), amount_minor: minor, monthly_minor: totalMinor, yearly_minor: totalMinor })),
+    groups: z.array(z.strictObject({ group: z.string(), monthly_minor: totalMinor, yearly_minor: totalMinor })),
+    monthly_minor: totalMinor,
+    yearly_minor: totalMinor,
+  }),
+  async run({ lines }) {
+    return { result: toSnake(calcTotals({ lines: lines.map((l) => ({ id: l.id, amountMinor: l.amount_minor, timesPerYear: PER_YEAR[l.frequency], group: l.group })) })) };
+  },
+});
+
+const calcSinkingFundTool = tool({
+  name: 'calc_sinking_fund',
+  title: 'Calculate a sinking fund',
+  kind: 'calc',
+  scope: null,
+  description: `Work out what to set aside each month for a bill that comes less often than monthly: a steady amount that is always enough, and, when the due date is known, what it takes to have it all in time. ${NOTE}`,
+  input: z.strictObject({
+    amount_minor: minor,
+    frequency: frequency.describe('How often it comes: quarterly, every_six_months or yearly.'),
+    reserved_minor: minor.default(0).describe('Already set aside for the next one.'),
+    next_due_date: isoDate.optional(),
+    start_date: isoDate.optional().describe('Today unless given.'),
+  }),
+  output: z.strictObject({
+    steady_monthly_minor: minor,
+    remaining_minor: minor,
+    reserved_minor: minor,
+    due_date: orNull(z.string()),
+    due_date_passed: z.boolean(),
+    months_left: orNull(z.number().int()),
+    catch_up_monthly_minor: orNull(minor),
+  }),
+  async run({ amount_minor, frequency: every, reserved_minor, next_due_date, start_date }) {
+    const everyMonths = lumpyMonths(every);
+    if (everyMonths === null) throw new ToolError('A sinking fund is for a bill that comes less often than monthly.');
+    return { result: toSnake(calcSinkingFund({ amountMinor: amount_minor, everyMonths, reservedMinor: reserved_minor, nextDueDate: next_due_date, today: start_date ?? thisMonth() })) };
+  },
+});
+
+const calcCashFlowTool = tool({
+  name: 'calc_cash_flow',
+  title: 'Calculate a cash flow',
+  kind: 'calc',
+  scope: null,
+  description: `Run a balance forward through dated amounts and find its lowest point and the first day there is not enough. On a day with money in and out, the money out goes first. ${NOTE}`,
+  input: z.strictObject({
+    opening_balance_minor: minor,
+    start_date: isoDate,
+    days: z.number().int().min(1).max(366),
+    events: z.array(z.strictObject({ id: z.string().min(1).max(40), date: isoDate, amount_minor: signedMinor.describe('Positive for money in, negative for money out.') })).max(300),
+  }),
+  output: z.strictObject({
+    end_date: z.string(),
+    end_minor: signedMinor,
+    money_in_minor: totalMinor,
+    money_out_minor: totalMinor,
+    lowest: z.strictObject({ date: z.string(), balance_minor: signedMinor }),
+    first_short_date: orNull(z.string()),
+    points: z.array(z.strictObject({ date: z.string(), change_minor: signedMinor, balance_minor: signedMinor, ids: z.array(z.string()) })),
+  }),
+  async run({ opening_balance_minor, start_date, days, events }) {
+    return { result: toSnake(calcCashFlow({ openingMinor: opening_balance_minor, startDate: start_date, days, events: toCamel(events) })) };
+  },
+});
+
+const calcAllocationTool = tool({
+  name: 'calc_allocation',
+  title: 'Share out an amount',
+  kind: 'calc',
+  scope: null,
+  description: `Share out an amount in the order given: each step gets what it needs, up to its cap, before the next gets anything. To share out the user's own money by their own profile, use preview_allocation. ${NOTE}`,
+  input: z.strictObject({
+    available_minor: minor,
+    steps: z.array(z.strictObject({ id: z.string().min(1).max(40), need_minor: minor, cap_minor: minor.optional() })).min(1).max(50),
+  }),
+  output: z.strictObject({
+    available_minor: minor,
+    lines: z.array(z.strictObject({ id: z.string(), wanted_minor: minor, allocated_minor: minor, unmet_minor: minor })),
+    allocated_minor: minor,
+    left_minor: minor,
+    first_unmet_id: orNull(z.string()),
+  }),
+  async run(args) {
+    return { result: toSnake(calcAllocation(toCamel(args))) };
+  },
+});
+
+export const calcTools = [calcBudgetTool, calcDebtPayoffTool, calcEmergencyFundTool, calcSavingsProjectionTool, calcTotalsTool, calcSinkingFundTool, calcCashFlowTool, calcAllocationTool];

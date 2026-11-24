@@ -1,5 +1,6 @@
 import { listCheckIns } from './checkins';
 import type { Ctx } from './context';
+import { effectiveGoals } from './funding';
 import { getLessonStates } from './lessons';
 import { listPlanVersions } from './plans';
 import { listGoals, listItems } from './profile';
@@ -27,7 +28,7 @@ export async function getProgress(ctx: Ctx, userId: string): Promise<Progress> {
   const summary = summarise(items);
   const states = [...lessonStates.entries()];
   return {
-    goals: goals.map((g) => ({
+    goals: effectiveGoals(goals, items).map((g) => ({
       id: g.id,
       status: g.status,
       percent: g.targetAmountMinor === 0 ? 100 : Math.min(100, Math.floor((g.currentAmountMinor * 100) / g.targetAmountMinor)),

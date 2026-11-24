@@ -12,6 +12,8 @@ export interface Deps {
   ctx: Ctx;
   /** Public address of the web app, for links back to it. */
   appUrl: string;
+  /** The permission each tool needs, by name. */
+  scopeOf: () => Record<string, Scope | null>;
 }
 
 /** What a call touched, by name and id only. This is all the activity log keeps. */

@@ -59,7 +59,11 @@ git pull
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 ```
 
-Migrations run automatically before the new app version starts.
+Migrations run automatically before the new app version starts. They only add to the database, so
+going back to an earlier version means checking it out and building again; what it does not know is
+left unused, with the exceptions listed under Reversibility in
+[VARIABLE_INCOME.md](VARIABLE_INCOME.md). To remove what the newest migration added as well, back the database up and run
+`pnpm --filter @fin/db rollback --i-have-a-backup` with `DATABASE_URL` set. **That deletes the data in it.**
 
 ## Backups
 

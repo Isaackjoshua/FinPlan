@@ -1,7 +1,9 @@
-import { desc, eq, schema } from '@fin/db';
+import { addMonths } from '@fin/calc';
+import { and, desc, eq, gte, isNull, schema, sql, type Executor } from '@fin/db';
 import type { z } from 'zod';
-import { actorColumns, getUserKey, type Actor, type Ctx } from './context';
+import { actorColumns, getUserKey, NotFoundError, type Actor, type Ctx } from './context';
 import { openJson, sealJson } from './crypto';
+import { incomeHistory, type IncomeHistory } from './history';
 import type { PlanVersion } from './plans';
 import { checkInInput, type CheckInInput } from './schemas';
 
@@ -17,6 +19,8 @@ export interface CheckIn extends Stored {
   loggedBy: 'user' | 'agent';
   /** The plan version that was current when this was logged, if there was one. */
   planVersionId: string | null;
+  /** When the user took it back; it is kept, but nothing counts it. */
+  voidedAt: Date | null;
 }
 
 const aad = (userId: string, id: string) => `check_ins:${userId}:${id}`;
@@ -45,15 +49,20 @@ export async function logCheckIn(
   return { id };
 }
 
-export async function listCheckIns(ctx: Ctx, userId: string, limit = 24): Promise<CheckIn[]> {
-  const rows = await ctx.db
+export async function listCheckIns(
+  ctx: Ctx,
+  userId: string,
+  limit = 24,
+  { includeVoided = false, since, exec = ctx.db }: { includeVoided?: boolean; /** Only those ending on or after this date. */ since?: string; exec?: Executor } = {},
+): Promise<CheckIn[]> {
+  const rows = await exec
     .select()
     .from(checkIns)
-    .where(eq(checkIns.userId, userId))
+    .where(and(eq(checkIns.userId, userId), includeVoided ? undefined : isNull(checkIns.voidedAt), since ? gte(checkIns.periodEnd, since) : undefined))
     .orderBy(desc(checkIns.periodEnd), desc(checkIns.createdAt))
     .limit(limit);
   if (rows.length === 0) return [];
-  const key = await getUserKey(ctx, userId);
+  const key = await getUserKey(ctx, userId, exec);
   return rows.map((row) => ({
     ...openJson<Stored>(key, aad(userId, row.id), row.data),
     id: row.id,
@@ -62,7 +71,26 @@ export async function listCheckIns(ctx: Ctx, userId: string, limit = 24): Promis
     loggedAt: row.createdAt,
     loggedBy: row.actorType,
     planVersionId: row.planVersionId,
+    voidedAt: row.voidedAt,
   }));
+}
+
+/** Takes a check-in back, or puts it back. Only ever called on behalf of the signed-in user: it is how they undo one an agent logged. */
+export async function setCheckInVoided(ctx: Ctx, userId: string, id: string, voided: boolean): Promise<void> {
+  const updated = await ctx.db
+    .update(checkIns)
+    .set({ voidedAt: voided ? sql`now()` : null })
+    .where(and(eq(checkIns.id, id), eq(checkIns.userId, userId)))
+    .returning({ id: checkIns.id });
+  if (updated.length === 0) throw new NotFoundError('Check-in');
+}
+
+/** Months looked back over for the twelve that count. Whole months, so that none is cut short. */
+const HISTORY_MONTHS = 24;
+
+/** What the user's check-ins show about their income. */
+export async function getIncomeHistory(ctx: Ctx, userId: string, today: string, exec: Executor = ctx.db): Promise<IncomeHistory> {
+  return incomeHistory(await listCheckIns(ctx, userId, 5000, { exec, since: `${addMonths(today.slice(0, 7), -HISTORY_MONTHS)}-01` }), today);
 }
 
 export interface Variance {

@@ -42,18 +42,35 @@ export function toDecimalString(minor: number, currency: string): string {
   return (minor / 10 ** digits).toFixed(digits);
 }
 
-export const FREQUENCIES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'] as const;
+export const FREQUENCIES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'every_six_months', 'yearly'] as const;
 export type Frequency = (typeof FREQUENCIES)[number];
 
-const PER_YEAR: Record<Frequency, number> = {
+export const PER_YEAR: Record<Frequency, number> = {
   weekly: 52,
   fortnightly: 26,
   monthly: 12,
   quarterly: 4,
+  every_six_months: 2,
   yearly: 1,
 };
 
 /** Converts a recurring amount to its monthly equivalent, rounded to the nearest minor unit. */
 export function toMonthly(amountMinor: number, frequency: Frequency): number {
   return Math.round((amountMinor * PER_YEAR[frequency]) / 12);
+}
+
+/** How long until something comes round again. */
+export const INTERVAL: Record<Frequency, { days: number } | { months: number }> = {
+  weekly: { days: 7 },
+  fortnightly: { days: 14 },
+  monthly: { months: 1 },
+  quarterly: { months: 3 },
+  every_six_months: { months: 6 },
+  yearly: { months: 12 },
+};
+
+/** Months between bills that come less often than monthly; null for the rest. */
+export function lumpyMonths(frequency: Frequency): number | null {
+  const interval = INTERVAL[frequency];
+  return 'months' in interval && interval.months > 1 ? interval.months : null;
 }

@@ -233,9 +233,49 @@ export const checkIns = pgTable(
     actorType: actorType('actor_type').notNull(),
     connectionId: uuid('connection_id'),
     data: text('data').notNull(),
+    /** Set when the user takes a check-in back. It is kept, but nothing counts it. */
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
     createdAt,
   },
   (t) => [index('check_ins_user_idx').on(t.userId, t.periodEnd)],
+);
+
+/** Money that arrived, on the day it arrived. Only the month is in clear text, as with check-ins. */
+export const incomeActuals = pgTable(
+  'income_actuals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** "2026-11" */
+    month: text('month').notNull(),
+    actorType: actorType('actor_type').notNull(),
+    connectionId: uuid('connection_id'),
+    data: text('data').notNull(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('income_actuals_user_idx').on(t.userId, t.month)],
+);
+
+/** How an amount of money was shared out. Nothing moves until the user confirms that it did. */
+export const allocations = pgTable(
+  'allocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    month: text('month').notNull(),
+    actorType: actorType('actor_type').notNull(),
+    connectionId: uuid('connection_id'),
+    data: text('data').notNull(),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('allocations_user_idx').on(t.userId, t.month)],
 );
 
 // ---------------------------------------------------------------------------

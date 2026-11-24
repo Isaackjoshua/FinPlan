@@ -1,6 +1,12 @@
-import type { ScenariosResult } from '@fin/calc';
-import { incomeBand, profileScenarios } from './income';
-import type { Item } from './profile';
+import { PROVISIONAL_MONTHS, type ScenariosResult } from '@fin/calc';
+import { givenToBills, sharedOutThisMonth } from './allocations';
+import { getIncomeHistory } from './checkins';
+import type { Ctx } from './context';
+import { effectiveGoals, goalFeasibility } from './funding';
+import type { IncomeHistory } from './history';
+import { incomeBand, leftOver, profileScenarios, withLeanIncome, type IncomeBand } from './income';
+import { listGoals, listItems, type Goal, type Item, type Profile } from './profile';
+import { expensesOf, obligations, type GivenThisMonth } from './spending';
 import { summarise, type Summary } from './summary';
 
 export interface Warning {
@@ -115,6 +121,8 @@ const LOW_SPENDING_PERCENT = 30;
 export interface ProfileCheck {
   /** When income varies, these totals describe a lean month. */
   summary: Summary;
+  /** Income to plan on, and where the figures come from. */
+  band: IncomeBand;
   /** Lean, typical and good months; null when income does not vary. */
   scenarios: ScenariosResult | null;
   warnings: Warning[];
@@ -124,15 +132,73 @@ export interface ProfileCheck {
   acknowledged: CompletenessCode[];
 }
 
+export interface CheckContext {
+  /** What check-ins show about income. */
+  history?: IncomeHistory;
+  goals?: Goal[];
+  /** Needed for anything with a date. */
+  today?: string;
+  given?: GivenThisMonth;
+}
+
+/** Where what arrived differs from what was expected. The profile is never changed by it; the user decides. */
+function historyWarnings(band: IncomeBand, history?: IncomeHistory): Warning[] {
+  if (band.belowDeclared) {
+    return [{ code: 'income_below_declared', severity: 'warn', message: 'A month brought in less than your profile says is the least to count on, so the lower figure is used.' }];
+  }
+  const measured = history?.measured;
+  // Nine tenths, so that small differences between months say nothing.
+  if (!band.varies && measured && measured.monthsObserved >= PROVISIONAL_MONTHS && measured.typicalMinor * 10 < band.leanMinor * 9) {
+    return [{ code: 'income_lower_than_recorded', severity: 'info', message: 'Your check-ins show noticeably less income than your profile. If it changes from month to month, record it as varying.' }];
+  }
+  return [];
+}
+
+const RARELY_SURVIVAL = new Set(['personal', 'entertainment', 'giving']);
+
+function spendingWarnings(items: Item[], { today, given }: CheckContext): Warning[] {
+  const warnings: Warning[] = [];
+  if (expensesOf(items).some((e) => e.essential && e.tier === undefined && RARELY_SURVIVAL.has(e.category))) {
+    warnings.push({ code: 'essential_worth_checking', severity: 'info', message: 'Some personal or entertainment spending is marked essential, which makes your emergency fund target larger. If you could live without it, say so.' });
+  }
+  if (today && obligations(items, today, given).items.some((o) => o.setAsideMinor > 0 && o.catchUpMonthlyMinor !== null && o.catchUpMonthlyMinor > o.steadyMonthlyMinor)) {
+    warnings.push({ code: 'bill_behind', severity: 'warn', message: 'A big bill is coming up and less has been set aside for it than is needed by now.' });
+  }
+  return warnings;
+}
+
+function goalWarnings(items: Item[], summary: Summary, scenarios: ScenariosResult | null, { goals, today }: CheckContext): Warning[] {
+  if (!goals || !today) return [];
+  const left = leftOver(summary, scenarios);
+  const verdicts = new Set(effectiveGoals(goals, items).flatMap((goal) => (goal.status === 'active' ? [goalFeasibility(goal, left, today).verdict] : [])));
+  const warnings: Warning[] = [];
+  if (verdicts.has('unreachable')) warnings.push({ code: 'goal_unreachable', severity: 'warn', message: 'A goal cannot be met by its date out of what is left over each month.' });
+  if (verdicts.has('date_passed')) warnings.push({ code: 'goal_date_passed', severity: 'info', message: 'The date of a goal has passed and it is not met yet.' });
+  return warnings;
+}
+
+/** Everything `checkProfile` can take into account, loaded for one user. */
+export async function loadProfileCheck(ctx: Ctx, userId: string, profile: Pick<Profile, 'acknowledgedWarnings'>, today: string) {
+  const [items, goals, history, shared] = await Promise.all([
+    listItems(ctx, userId),
+    listGoals(ctx, userId),
+    getIncomeHistory(ctx, userId, today),
+    sharedOutThisMonth(ctx, userId, today),
+  ]);
+  const given = givenToBills(shared);
+  return { items, goals, history, given, ...checkProfile(items, profile.acknowledgedWarnings, { history, goals, today, given }) };
+}
+
 /**
  * Totals a profile and flags what is wrong, risky or missing in it. Use this rather than
  * `summarise` wherever the totals are shown: a surplus from a half-filled profile misleads.
  */
-export function checkProfile(items: Item[], acknowledgedCodes: readonly string[] = []): ProfileCheck {
-  const summary = summarise(items);
-  const scenarios = profileScenarios(items, summary);
+export function checkProfile(items: Item[], acknowledgedCodes: readonly string[] = [], more: CheckContext = {}): ProfileCheck {
+  const band = incomeBand(items, more.history);
+  const summary = withLeanIncome(summarise(items), band);
+  const scenarios = profileScenarios(band, summary);
   // The most any kind of month is known to bring in, and to leave over.
-  const { leanMinor, typicalMinor, goodMinor } = incomeBand(items);
+  const { leanMinor, typicalMinor, goodMinor } = band;
   const usualIncome = typicalMinor ?? leanMinor;
   const bestSurplus = Math.max(leanMinor, typicalMinor ?? 0, goodMinor ?? 0) - leanMinor + summary.monthlySurplus;
   const missing: Warning[] = [];
@@ -163,8 +229,9 @@ export function checkProfile(items: Item[], acknowledgedCodes: readonly string[]
 
   return {
     summary,
+    band,
     scenarios,
-    warnings: [...missing, ...profileWarnings(summary, scenarios)],
+    warnings: [...missing, ...profileWarnings(summary, scenarios), ...historyWarnings(band, more.history), ...spendingWarnings(items, more), ...goalWarnings(items, summary, scenarios, more)],
     surplusReliable: !missing.some((w) => w.code === 'surplus_unreliable'),
     acknowledged,
   };
