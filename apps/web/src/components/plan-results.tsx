@@ -1,4 +1,5 @@
 import { formatAmount, type PlanResults } from '@fin/core';
+import { ScenarioNotes, ScenarioTable } from './income-scenarios';
 
 /** "2027-01" -> "January 2027" */
 export function monthName(month: string): string {
@@ -34,7 +35,7 @@ export function PlanResultsView({
   names: Map<string, string>;
 }) {
   const money = (minor: number) => formatAmount(minor, currency);
-  const { monthly, debt, emergencyFund, goals, warnings } = results;
+  const { monthly, debt, emergencyFund, goals, warnings, scenarios } = results;
   const chosen = debt ? debt[strategy ?? 'avalanche'] : null;
   const other = debt ? debt[(strategy ?? 'avalanche') === 'avalanche' ? 'snowball' : 'avalanche'] : null;
 
@@ -52,7 +53,7 @@ export function PlanResultsView({
       )}
 
       <dl>
-        <Row label="Monthly income" value={money(monthly.incomeMinor)} />
+        <Row label={scenarios ? 'Income in a lean month' : 'Monthly income'} value={money(monthly.incomeMinor)} />
         <Row label="Budgeted spending" value={money(monthly.budgetedSpendingMinor)} />
         <Row label="Debt payments" value={money(monthly.debtPaymentsMinor)} />
         <Row label="Towards goals" value={money(monthly.goalContributionsMinor)} />
@@ -63,6 +64,24 @@ export function PlanResultsView({
           tone={monthly.unallocatedMinor < 0 ? 'bad' : undefined}
         />
       </dl>
+
+      {scenarios && (
+        <div>
+          <p className="font-medium">When your income varies</p>
+          {scenarios.omittedSpendingMinor > 0 && (
+            <p className="text-muted">Counting <span className="num">{money(scenarios.omittedSpendingMinor)}</span> a month of spending this plan leaves out.</p>
+          )}
+          <ScenarioTable result={scenarios} currency={currency} />
+          <div className="mt-1 text-muted">
+            <ScenarioNotes result={scenarios} currency={currency} />
+            {monthly.goalContributionsMinor > 0 && (
+              <p className="mt-1">
+                A lean month can put <span className="num">{money(scenarios.scenarios[0]!.goalFundingMinor!)}</span> of the planned <span className="num">{money(monthly.goalContributionsMinor)}</span> towards goals.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {chosen && (
         <div>
@@ -110,6 +129,7 @@ export function PlanResultsView({
       {goals.length > 0 && (
         <div>
           <p className="font-medium">Goals</p>
+          {scenarios && <p className="text-muted">These dates hold only if every month can pay the full amount.</p>}
           <ul>
             {goals.map((g) => (
               <li key={g.goalId}>

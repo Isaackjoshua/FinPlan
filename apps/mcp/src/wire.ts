@@ -1,5 +1,5 @@
-import { CalcError } from '@fin/calc';
-import { ConflictError, DEBT_KINDS, EXPENSE_CATEGORIES, FREQUENCIES, NotFoundError, type PlanVersion } from '@fin/core';
+import { CalcError, SCENARIOS } from '@fin/calc';
+import { ConflictError, DEBT_KINDS, EXPENSE_CATEGORIES, FREQUENCIES, INCOME_VARIABILITY, NotFoundError, type PlanVersion } from '@fin/core';
 import { z, ZodError } from 'zod';
 
 /**
@@ -137,6 +137,26 @@ export const emergencyFundResult = z.strictObject({
   target_reached_month: orNull(z.string()),
 });
 
+// What each kind of month works out to when income varies. Newer than some connected apps'
+// tool lists, so only ever returned to a caller that asks for it.
+export const scenarioName = z.enum(SCENARIOS);
+const scenario = z.strictObject({
+  scenario: scenarioName,
+  income_minor: orNull(minor).describe('Null when no figure is recorded for this kind of month. Do not estimate one.'),
+  balance_minor: orNull(signedMinor).describe('Income minus all outgoings. Negative is a shortfall.'),
+  essentials_balance_minor: orNull(signedMinor).describe('Income minus essentials and minimum debt payments only.'),
+  goal_funding_minor: orNull(minor).describe('How much of the planned goal contributions such a month can pay for.'),
+});
+export const scenariosResult = z.strictObject({
+  scenarios: z.array(scenario),
+  break_even_minor: minor.describe('The income at which a month balances.'),
+  essentials_break_even_minor: minor,
+  lean_months_covered: orNull(z.number()).describe('Lean months the emergency fund makes up for; null when a lean month has no shortfall.'),
+  lean_months_of_essentials_covered: orNull(z.number()),
+});
+export const incomeBasis = z.enum(['declared']).describe('declared: what the user said they expect, not measured.');
+export const variability = z.enum(INCOME_VARIABILITY);
+
 export const variance = z.strictObject({ period_days: z.number().int(), spending: z.array(line.extend({ category: z.string() })), income: line, debt_payments: line });
 
 // A saved plan.
@@ -162,7 +182,14 @@ export const planResults = z.strictObject({
   emergency_fund: emergencyFundResult,
   goals: z.array(z.strictObject({ goal_id: z.string(), months_to_target: orNull(z.number().int()), target_reached_month: orNull(z.string()) })),
   warnings: z.array(warning),
+  scenarios: scenariosResult
+    .extend({ basis: incomeBasis, omitted_spending_minor: minor.describe('Spending in the profile that the plan leaves out. The scenarios count it.') })
+    .optional()
+    .describe('Only when asked for and income varies; `monthly` then describes a lean month.'),
 });
+/** Extra parts of a plan's results, returned only to callers that ask. */
+export const include = z.array(z.enum(['scenarios'])).max(1).optional().describe('`scenarios` adds lean, typical and good months when income varies.');
+type Include = z.infer<typeof include>;
 export const plan = z.strictObject({
   version: z.number().int(),
   saved_at: z.string(),
@@ -176,9 +203,10 @@ export const plan = z.strictObject({
 type PlanResultsOut = z.infer<typeof planResults>;
 
 /** Shapes saved results for the wire. `summary` leaves out the budget breakdown and month-by-month debt detail. */
-export function resultsOut(results: PlanVersion['results'], detail: 'summary' | 'full'): PlanResultsOut | null {
+export function resultsOut(results: PlanVersion['results'], detail: 'summary' | 'full', extra: Include): PlanResultsOut | null {
   if (!results) return null;
   const out = toSnake<PlanResultsOut>(results);
+  if (!extra?.includes('scenarios')) delete out.scenarios;
   if (detail === 'summary') {
     delete out.budget;
     for (const strategy of [out.debt?.snowball, out.debt?.avalanche]) {
@@ -191,7 +219,7 @@ export function resultsOut(results: PlanVersion['results'], detail: 'summary' | 
   return out;
 }
 
-export function planOut(version: PlanVersion, detail: 'summary' | 'full'): z.infer<typeof plan> {
+export function planOut(version: PlanVersion, detail: 'summary' | 'full', extra: Include): z.infer<typeof plan> {
   return {
     version: version.version,
     saved_at: version.savedAt.toISOString(),
@@ -199,7 +227,7 @@ export function planOut(version: PlanVersion, detail: 'summary' | 'full'): z.inf
     is_current: version.isCurrent,
     user_text: { summary: version.summary },
     inputs: toSnake(version.inputs),
-    results: resultsOut(version.results, detail),
+    results: resultsOut(version.results, detail, extra),
   };
 }
 

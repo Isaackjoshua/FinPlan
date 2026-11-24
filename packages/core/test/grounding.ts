@@ -32,3 +32,7 @@ export const debt: Item = { id: 'debt', kind: 'debt', label: 'Friend', debtKind:
 export const groundingItems: Item[] = [income, rent, food, claude, data, ...otherExpenses, savings, debt];
 /** As it stood when it misled people: no housing, no food, no transport. */
 export const incompleteItems: Item[] = [income, claude, data, savings, debt];
+
+/** The same profile, with income recorded as it really is: 200,000 at the least, and nothing else known. */
+export const variableIncome: Item = { ...income, variability: 'variable' } as Item;
+export const variableItems: Item[] = groundingItems.map((item) => (item === income ? variableIncome : item));

@@ -44,6 +44,7 @@ export function recommendLessons(summary: Summary, warnings: Warning[], complete
   // Most pressing first: a lesson matching an earlier tag outranks one matching a later tag.
   const wanted: Tag[] = [];
   if (summary.monthlyIncome === 0) wanted.push('getting-started');
+  if (codes.has('lean_month_shortfall') || codes.has('income_uncertain')) wanted.push('irregular-income');
   if (codes.has('spending_exceeds_income')) wanted.push('overspending');
   if (codes.has('high_interest_debt')) wanted.push('high-interest-debt');
   if (summary.totalDebt > 0) wanted.push('debt');

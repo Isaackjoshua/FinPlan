@@ -8,6 +8,7 @@ import {
   getProgress,
   GOAL_KINDS,
   GOAL_STATUSES,
+  incomeBand,
   listCheckIns,
   listGoals,
   listItems,
@@ -24,6 +25,8 @@ import {
   category,
   debtKind,
   frequency,
+  include,
+  incomeBasis,
   isoDate,
   minor,
   orNull,
@@ -31,10 +34,12 @@ import {
   plan,
   planOut,
   POSITIONING,
+  scenariosResult,
   signedMinor,
   toSnake,
   ToolError,
   USER_TEXT_NOTE,
+  variability,
   variance,
   warning,
 } from '../wire';
@@ -60,10 +65,12 @@ const getProfileTool = tool({
   description: `Read the user's financial profile. By default returns only monthly totals and warnings; ask for line items with \`sections\`, and request only what you need. Read this before proposing changes, and pass the returned \`revision\` to update_profile. ${MINOR_NOTE} ${USER_TEXT_NOTE}`,
   input: z.strictObject({
     sections: z
-      .array(z.enum(['summary', 'income', 'expenses', 'debts', 'savings']))
-      .max(5)
+      .array(z.enum(['summary', 'income', 'expenses', 'debts', 'savings', 'income_band', 'completeness']))
+      .max(7)
       .default(['summary'])
-      .describe('Which parts to return. `summary` is totals only; the others are the individual line items.'),
+      .describe(
+        'Which parts to return. `summary` is totals only; `income`, `expenses`, `debts` and `savings` are the individual line items. `income_band` says whether income varies and what a lean, typical and good month work out to. `completeness` says whether the profile is complete enough to rely on.',
+      ),
   }),
   output: z.strictObject({
     currency: z.string(),
@@ -90,6 +97,23 @@ const getProfileTool = tool({
     expenses: z.array(z.strictObject({ id: z.string(), amount_minor: minor, frequency, category, essential: z.boolean(), user_text: label })).optional(),
     debts: z.array(z.strictObject({ id: z.string(), debt_kind: debtKind, balance_minor: minor, apr_bps: bps, minimum_payment_minor: minor, user_text: label })).optional(),
     savings: z.array(z.strictObject({ id: z.string(), balance_minor: minor, apy_bps: bps, is_emergency_fund: z.boolean(), user_text: label })).optional(),
+    income_band: z
+      .strictObject({
+        varies: z.boolean().describe('When true, monthly income and surplus in `summary` describe a lean month.'),
+        basis: incomeBasis,
+        lean_minor: minor,
+        typical_minor: orNull(minor),
+        good_minor: orNull(minor),
+        sources: z.array(z.strictObject({ id: z.string(), variability, lean_minor: minor, typical_minor: orNull(minor), good_minor: orNull(minor) })).describe('Monthly, per income item.'),
+        results: scenariosResult.nullable().describe('Null when income does not vary.'),
+      })
+      .optional(),
+    completeness: z
+      .strictObject({
+        surplus_reliable: z.boolean().describe('When false, do not present the surplus as money the user has, or plan on it.'),
+        acknowledged: z.array(z.string()).describe('Checks the user has said are right for them.'),
+      })
+      .optional(),
   }),
   async run({ sections }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
@@ -98,7 +122,8 @@ const getProfileTool = tool({
     // Line items leave their label out of the main object and carry it in `user_text`.
     const lines = (kind: string) =>
       items.filter((item) => item.kind === kind).map(({ kind: _kind, label: text, ...rest }) => ({ ...toSnake(rest), user_text: { label: text } }));
-    const { summary: totals, warnings } = checkProfile(items, profile.acknowledgedWarnings);
+    const { summary: totals, warnings, scenarios, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
+    const band = incomeBand(items);
     return {
       result: {
         currency: profile.currency,
@@ -125,6 +150,22 @@ const getProfileTool = tool({
         ...(wants('expenses') && { expenses: lines('expense') }),
         ...(wants('debts') && { debts: lines('debt') }),
         ...(wants('savings') && { savings: lines('savings') }),
+        ...(wants('income_band') && {
+          income_band: {
+            varies: band.varies,
+            basis: band.basis,
+            lean_minor: band.leanMinor,
+            typical_minor: band.typicalMinor,
+            good_minor: band.goodMinor,
+            sources: items.flatMap((item) => {
+              if (item.kind !== 'income') return [];
+              const one = incomeBand([item]);
+              return [{ id: item.id, variability: item.variability ?? 'fixed', lean_minor: one.leanMinor, typical_minor: one.typicalMinor, good_minor: one.goodMinor }];
+            }),
+            results: scenarios && toSnake(scenarios),
+          },
+        }),
+        ...(wants('completeness') && { completeness: { surplus_reliable: surplusReliable, acknowledged } }),
       },
     };
   },
@@ -181,12 +222,12 @@ const getCurrentPlanTool = tool({
   kind: 'read',
   scope: 'finance:read',
   description: `Read the plan the user is currently following: the choices in it and the figures the platform computed from them. \`plan\` is null if no plan has been saved yet. ${MINOR_NOTE} ${USER_TEXT_NOTE} ${POSITIONING}`,
-  input: z.strictObject({ detail }),
+  input: z.strictObject({ detail, include }),
   output: planOutput,
-  async run({ detail: level }, auth, { ctx }) {
+  async run({ detail: level, include: extra }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
     const current = await getCurrentPlan(ctx, auth.userId);
-    return { result: { currency: profile.currency, plan: current ? planOut(current, level) : null } };
+    return { result: { currency: profile.currency, plan: current ? planOut(current, level, extra) : null } };
   },
 });
 
@@ -196,11 +237,11 @@ const getPlanVersionTool = tool({
   kind: 'read',
   scope: 'finance:read',
   description: `Read one saved version of the plan by its number, for example to compare it with the current one. ${MINOR_NOTE} ${USER_TEXT_NOTE} ${POSITIONING}`,
-  input: z.strictObject({ version: z.number().int().positive(), detail }),
+  input: z.strictObject({ version: z.number().int().positive(), detail, include }),
   output: planOutput,
-  async run({ version, detail: level }, auth, { ctx }) {
+  async run({ version, detail: level, include: extra }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
-    return { result: { currency: profile.currency, plan: planOut(await getPlanVersion(ctx, auth.userId, version), level) } };
+    return { result: { currency: profile.currency, plan: planOut(await getPlanVersion(ctx, auth.userId, version), level, extra) } };
   },
 });
 

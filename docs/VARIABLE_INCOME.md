@@ -1,6 +1,6 @@
 # Variable income: findings, proposed changes and plan
 
-Status: **slice 1 is built; slices 2 to 9 await approval.** Findings were checked against commit
+Status: **slices 1 and 2 are built; slices 3 to 9 are not started.** Findings were checked against commit
 `9b80935`, before slice 1, where all 179 tests passed; line numbers refer to it. Figures marked *reproduced* come from running the real functions
 on the grounding case.
 
@@ -63,7 +63,7 @@ Words used here:
    One filter covers every tool and every level; listing fields by hand missed a nested one.
 4. **An update keeps what it does not mention** (fixes N4). `null` clears a field. An old-style change to a
    variable income's amount is refused with an explanation; it is never guessed at.
-5. **Old fields keep a safe meaning.** For variable income `amountMinor` always equals the floor, so older
+5. **Old fields keep a safe meaning.** For variable income `amountMinor` is the floor, so older
    code and older agents see the cautious figure.
 6. Single-amount profiles produce the same numbers as today, apart from the N8 and N9 fixes.
 
@@ -75,7 +75,7 @@ Items, goals and plans are encrypted JSON, so most additions need **no SQL migra
 
 | Change | Where | SQL? |
 |---|---|---|
-| Income: `variability` (`fixed` default, `variable`), `floorMinor`, `typicalMinor?`, `highMinor?`. Monthly only; floor ≤ typical ≤ high; **typical and high may be unknown** | item JSON | No |
+| Income: `variability?` (`fixed` default, `variable`), `typicalMinor?`, `highMinor?`. `amountMinor` is the floor, so there is no second copy to disagree with it. Monthly only; floor ≤ typical ≤ high; **typical and high may be unknown** | item JSON | No |
 | Expense: `tier?` `survival` / `committed` / `discretionary` | item JSON | No |
 | Expense: `nextDueDate?` (rolls forward by frequency, so it works for monthly and quarterly), `reservedMinor?` (already set aside) | item JSON | No |
 | Income: `arrival?` `{ fromDay, toDay }` | item JSON | No |
@@ -129,11 +129,15 @@ Each of lean, typical and good is either figures or `unknown` with a reason, plu
 - The 300,000 saved covers 1.0 lean month in full, or 2.3 of survival spending.
 - How often lean months happen: not known.
 
+As built in slice 2: a plan's scenarios also count spending in the profile that its budget leaves out, so an
+empty budget still shows the shortfall. With variable income `spending_exceeds_income` and
+`plan_exceeds_income` are raised only when a typical month is known to fall short.
+
 ### Tools
 
 | Tool | Change | Version risk |
 |---|---|---|
-| `get_profile` | New sections: `income_band`, `completeness`, `line_details`, `obligations`, `cash_flow` | None, opt-in |
+| `get_profile` | New sections: `income_band`, `completeness` (built); `line_details`, `obligations`, `cash_flow` | None, opt-in |
 | `update_profile` | Optional new item fields | None |
 | `save_plan_version`, `get_current_plan`, `get_plan_version` | `include: ['scenarios']`. New warnings always: `lean_month_shortfall`, `income_uncertain`, `plan_omits_expenses` | None, opt-in |
 | `create_goal`, `update_goal`, `list_goals` | Optional new fields; `include: ['feasibility', 'parts']`. Also a `goal_unreachable` warning in `get_profile` | None, opt-in |
@@ -144,7 +148,7 @@ Each of lean, typical and good is either figures or `unknown` with a reason, plu
 | New: `get_capabilities` | Granted permissions and, with read access, currency decimals plus a worked example (N11). Also stated in the per-connection instructions | None, additive |
 | New: `record_allocation` | Write tool, undoable | None, additive |
 
-The engine version is `1.0.1` after slice 1 and moves to `1.1.0` in slice 2. The count of 19 tools in the
+The engine version is `1.0.1` after slice 1 and is `1.1.0` from slice 2. The count of 19 tools in the
 tests changes when tools are added.
 
 ### The calculators

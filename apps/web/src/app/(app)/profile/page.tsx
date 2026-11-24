@@ -1,5 +1,5 @@
 import { Empty, Field, Flash, humanise, PageHeader } from '@/components/ui';
-import { money, percent, run, str } from '@/lib/forms';
+import { money, optionalMoney, percent, run, str } from '@/lib/forms';
 import { getCtx } from '@/lib/server';
 import { requireProfile } from '@/lib/session';
 import {
@@ -26,9 +26,21 @@ async function saveItem(form: FormData) {
     const kind = str(form, 'kind') as ItemKind;
     const base = { id: str(form, 'id') || undefined, label: str(form, 'label') };
     const frequency = str(form, 'frequency') as (typeof FREQUENCIES)[number];
+    const variable = str(form, 'variability') === 'variable';
     const input =
       kind === 'income'
-        ? { ...base, kind, amountMinor: money(form, 'amount', cur, 'Amount'), frequency }
+        ? {
+            ...base,
+            kind,
+            amountMinor: money(form, 'amount', cur, 'Amount'),
+            // Variable income is recorded by the month, so the form hides how often.
+            frequency: variable ? ('monthly' as const) : frequency,
+            variability: variable ? ('variable' as const) : ('fixed' as const),
+            ...(variable && {
+              typicalMinor: optionalMoney(form, 'typical', cur, 'Typical month') ?? null,
+              highMinor: optionalMoney(form, 'high', cur, 'Good month') ?? null,
+            }),
+          }
         : kind === 'expense'
           ? {
               ...base,
@@ -65,7 +77,7 @@ async function removeItem(form: FormData) {
 }
 
 const SECTIONS: { kind: ItemKind; title: string; blurb: string; add: string }[] = [
-  { kind: 'income', title: 'Income', blurb: 'What you take home after tax.', add: 'Add income' },
+  { kind: 'income', title: 'Income', blurb: 'What you take home after tax. If it changes from month to month, say so and FinPlan plans for the lean months too.', add: 'Add income' },
   { kind: 'expense', title: 'Expenses', blurb: 'Regular spending. Mark the ones you cannot go without as essential.', add: 'Add an expense' },
   { kind: 'debt', title: 'Debts', blurb: 'Loans and balances you owe, with their interest rate.', add: 'Add a debt' },
   { kind: 'savings', title: 'Savings', blurb: 'Money set aside, including your emergency fund.', add: 'Add savings' },
@@ -83,18 +95,42 @@ function ItemForm({ kind, item, currency }: { kind: ItemKind; item?: Item; curre
   const amount = (minor?: number) => (minor === undefined ? '' : toDecimalString(minor, currency));
   const pct = (bps?: number) => (bps === undefined ? '' : (bps / 100).toString());
   return (
-    <form action={saveItem} className="mt-3 grid gap-3 sm:grid-cols-2">
+    <form action={saveItem} className="group/item mt-3 grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="kind" value={kind} />
       {item && <input type="hidden" name="id" value={item.id} />}
       <Field label="Name"><input name="label" required maxLength={80} defaultValue={item?.label} className="input" /></Field>
 
+      {kind === 'income' && (
+        <Field label="Does it change from month to month?">
+          <select name="variability" defaultValue={item?.kind === 'income' ? (item.variability ?? 'fixed') : 'fixed'} className="input">
+            <option value="fixed">No, it stays the same</option>
+            <option value="variable">Yes, it varies</option>
+          </select>
+        </Field>
+      )}
       {(kind === 'income' || kind === 'expense') && (
         <>
-          <Field label={`Amount (${currency})`}>
-            <input name="amount" required inputMode="decimal" defaultValue={amount(item && 'amountMinor' in item ? item.amountMinor : undefined)} className="input" />
-          </Field>
-          <Field label="How often"><Select name="frequency" options={FREQUENCIES} value={item && 'frequency' in item ? item.frequency : 'monthly'} /></Field>
+          <div>
+            <Field label={`Amount (${currency})`}>
+              <input name="amount" required inputMode="decimal" defaultValue={amount(item && 'amountMinor' in item ? item.amountMinor : undefined)} className="input" />
+            </Field>
+            {/* Shown without JavaScript, by what is chosen above. */}
+            <p className="mt-1 hidden text-xs text-muted group-has-[option[value=variable]:checked]/item:block">A lean month: the least you can count on. Enter 0 if nothing is certain.</p>
+          </div>
+          <div className="group-has-[option[value=variable]:checked]/item:hidden">
+            <Field label="How often"><Select name="frequency" options={FREQUENCIES} value={item && 'frequency' in item ? item.frequency : 'monthly'} /></Field>
+          </div>
         </>
+      )}
+      {kind === 'income' && (
+        <div className="hidden gap-3 group-has-[option[value=variable]:checked]/item:grid sm:col-span-2 sm:grid-cols-2">
+          <Field label={`A typical month (${currency})`} hint="Leave empty if you do not know.">
+            <input name="typical" inputMode="decimal" defaultValue={amount(item?.kind === 'income' ? (item.typicalMinor ?? undefined) : undefined)} className="input" />
+          </Field>
+          <Field label={`A good month (${currency})`} hint="Leave empty if you do not know.">
+            <input name="high" inputMode="decimal" defaultValue={amount(item?.kind === 'income' ? (item.highMinor ?? undefined) : undefined)} className="input" />
+          </Field>
+        </div>
       )}
       {kind === 'expense' && (
         <>
@@ -134,8 +170,12 @@ function ItemForm({ kind, item, currency }: { kind: ItemKind; item?: Item; curre
 
 function describe(item: Item, currency: string): string {
   switch (item.kind) {
-    case 'income':
-      return `${formatAmount(item.amountMinor, currency)} ${item.frequency}`;
+    case 'income': {
+      if (item.variability !== 'variable') return `${formatAmount(item.amountMinor, currency)} ${item.frequency}`;
+      const typical = item.typicalMinor == null ? 'typical month not known' : `typically ${formatAmount(item.typicalMinor, currency)}`;
+      const high = item.highMinor == null ? '' : `, up to ${formatAmount(item.highMinor, currency)}`;
+      return `Varies: at least ${formatAmount(item.amountMinor, currency)} a month, ${typical}${high}`;
+    }
     case 'expense':
       return `${formatAmount(item.amountMinor, currency)} ${item.frequency} · ${humanise(item.category)}${item.essential ? ' · essential' : ''}`;
     case 'debt':

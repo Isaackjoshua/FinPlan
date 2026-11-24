@@ -248,6 +248,17 @@ const exported = JSON.parse((await get('/account/export')).html);
 check('export contains the account, profile, plans and app history', exported.account.email === email && exported.profile.currency === 'KES' && exported.items.length === 5 && exported.planVersions.length === 3 && exported.connectedApps.length >= 1 && exported.recentAppActivity.length > 0, JSON.stringify(Object.keys(exported)));
 check('export holds the real figures', exported.items.some((item) => item.label === 'Salary' && item.amountMinor === 12_000_000));
 
+// Income that varies.
+const salary = (f) => f.hidden.kind === 'income' && f.hidden.id;
+check('a typical month below a lean one is refused', (await submit('/profile', salary, { label: 'Salary', amount: '60000', frequency: 'monthly', variability: 'variable', typical: '50000', high: '' })).includes('error='));
+await submit('/profile', salary, { label: 'Salary', amount: '60000', frequency: 'weekly', variability: 'variable', typical: '', high: '' });
+check('profile says what is not known', txt((await get('/profile')).html).includes('Varies: at least KES 60,000.00 a month, typical month not known'));
+dash = txt((await get('/dashboard')).html);
+check('dashboard shows the lean month (60,000 − 66,666.67 − 3,000)', dash.includes('Short in a lean month') && dash.includes('KES 9,666.67'), dash.slice(0, 500));
+check('dashboard guesses nothing about other months', dash.includes('Typical month Not known') && dash.includes('Good month Not known'));
+await plan('A plan for lean months');
+check('plan shows what a lean month works out to', txt((await get('/plan')).html).includes('When your income varies'));
+
 await submit('/dashboard', (f) => f.body.includes('Sign out'), {});
 check('signed out', (await get('/dashboard')).url.startsWith('/sign-in'));
 check('export needs a signed-in user', (await get('/account/export')).status === 401);

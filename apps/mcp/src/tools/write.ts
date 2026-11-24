@@ -22,9 +22,11 @@ import {
   frequency,
   IDEMPOTENCY_NOTE,
   idempotencyKey,
+  include,
   isoDate,
   minor,
   MINOR_NOTE,
+  orNull,
   planResults,
   POSITIONING,
   resultsOut,
@@ -32,6 +34,7 @@ import {
   ToolError,
   toSnake,
   USER_TEXT_NOTE,
+  variability,
   variance,
   warning,
 } from '../wire';
@@ -43,7 +46,15 @@ const UNDO_NOTE = 'The user sees every change you make, marked as made by an age
 const label = z.string().min(1).max(80).describe('Short name shown to the user, e.g. "Salary" or "Rent".');
 
 const item = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('income'), label, amount_minor: minor, frequency }),
+  z.strictObject({
+    kind: z.literal('income'),
+    label,
+    amount_minor: minor.describe('For variable income, the least the user can count on in a month (0 if nothing is certain).'),
+    frequency: frequency.describe('Variable income is always "monthly".'),
+    variability: variability.optional().describe('"variable" when what comes in changes from month to month. Give it whenever you change an income item.'),
+    typical_minor: orNull(minor).optional().describe('Variable income only: a typical month, if the user knows it. Leave out what they do not know; null clears it.'),
+    high_minor: orNull(minor).optional().describe('Variable income only: a good month, if the user knows it.'),
+  }),
   z.strictObject({ kind: z.literal('expense'), label, amount_minor: minor, frequency, category, essential: z.boolean().describe('True for needs (housing, food, utilities…), false for wants.') }),
   z.strictObject({ kind: z.literal('debt'), label, debt_kind: debtKind, balance_minor: minor, apr_bps: bps.describe('Annual interest rate in basis points: 1999 = 19.99%.'), minimum_payment_minor: minor.describe('Minimum payment per month.') }),
   z.strictObject({ kind: z.literal('savings'), label, balance_minor: minor, apy_bps: bps, is_emergency_fund: z.boolean() }),
@@ -185,14 +196,15 @@ const savePlanVersionTool = tool({
     emergency_fund_months: z.number().int().min(0).max(24).optional().describe('How many months of essential spending the emergency fund should cover (default 3).'),
     goal_contributions: z.array(z.strictObject({ goal_id: z.uuid(), amount_minor: minor })).max(20).optional().describe('Monthly amount towards each goal.'),
     base_version: z.number().int().positive().optional().describe('The version you based this on. If given, the save is refused when the current version is a different one.'),
+    include,
     idempotency_key: idempotencyKey,
   }),
   output: z.strictObject({ version: z.number().int(), currency: z.string(), results: planResults }),
-  async run({ summary, base_version, idempotency_key: _key, ...inputs }, auth, { ctx }) {
+  async run({ summary, base_version, include: extra, idempotency_key: _key, ...inputs }, auth, { ctx }) {
     const profile = await needProfile(ctx, auth.userId);
     const { version, results } = await savePlanVersion(ctx, auth.userId, agent(auth), { summary, inputs: toCamel(inputs), baseVersion: base_version });
     return {
-      result: { version, currency: profile.currency, results: resultsOut(results, 'summary')! },
+      result: { version, currency: profile.currency, results: resultsOut(results, 'summary', extra)! },
       touched: { entityType: 'plan_version', entityId: String(version), changedFields: Object.keys(inputs) },
     };
   },

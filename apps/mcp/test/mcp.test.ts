@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createUser, testCtx } from '../../../packages/core/test/helpers';
 import { INSTRUCTIONS, TOOLS } from '../src';
-import { groundingItems, incompleteItems } from '../../../packages/core/test/grounding';
+import { groundingItems, incompleteItems, variableItems } from '../../../packages/core/test/grounding';
 import { CONTRACT, matchesContract } from './contract';
 import { startStack } from './harness';
 
@@ -145,6 +145,84 @@ describe('AI apps that connected before variable income', () => {
       expect(plan.inputs).toMatchObject({ budget: [{ category: 'food', amount_minor: 1 }], goal_contributions: [{ goal_id, amount_minor: 5 }] });
       expect(plan.results.debt.avalanche.feasible).toBe(true);
     }
+  });
+});
+
+describe('income that varies', () => {
+  const NEWER = { newer: true };
+  const seeded = async () => {
+    const user = await newUser('TZS');
+    for (const { id: _id, ...item } of variableItems) await upsertItem(ctx, user, USER, item);
+    return { user, agent: await stack.connect(user, ['finance:read', 'finance:write']) };
+  };
+
+  it('reaches apps that do not know about it as a cautious figure and warnings', async () => {
+    const { agent } = await seeded();
+    // Checked against the older tool list by the harness.
+    const profile = await agent.call('get_profile', { sections: ['summary', 'income'] });
+    expect(profile.summary).toMatchObject({ monthly_income_minor: 20_000_000, monthly_surplus_minor: -27_350_000 });
+    expect(profile.summary.warnings.map((w: any) => w.code)).toEqual(['lean_month_shortfall', 'income_uncertain', 'low_emergency_fund']);
+    const saved = await agent.call('save_plan_version', { summary: 'Nothing budgeted', budget: [] });
+    expect(saved.results.warnings.map((w: any) => w.code)).toEqual(['plan_omits_expenses', 'lean_month_shortfall', 'income_uncertain']);
+    expect(saved.results).not.toHaveProperty('scenarios');
+    expect((await agent.call('get_current_plan')).plan.results).not.toHaveProperty('scenarios');
+    // Correcting a label is fine; changing the amount without saying what it means is not.
+    const [line] = profile.income;
+    const change = (item: object) => agent.call('update_profile', { expected_revision: profile.revision, items: [{ op: 'upsert', id: line.id, item: { kind: 'income', label: 'Work', frequency: 'monthly', ...item } }] });
+    await expect(change({ amount_minor: 30_000_000 })).rejects.toThrow(/month to month/);
+    await change({ amount_minor: 20_000_000 });
+    expect((await agent.call('get_profile', { sections: ['income_band'] }, NEWER)).income_band.varies).toBe(true);
+  });
+
+  it('is there in full for apps that ask', async () => {
+    const { agent } = await seeded();
+    const profile = await agent.call('get_profile', { sections: ['income_band', 'completeness'] }, NEWER);
+    expect(profile.completeness).toEqual({ surplus_reliable: true, acknowledged: [] });
+    expect(profile.income_band).toMatchObject({ varies: true, basis: 'declared', lean_minor: 20_000_000, typical_minor: null, good_minor: null });
+    expect(profile.income_band.sources).toEqual([{ id: expect.any(String), variability: 'variable', lean_minor: 20_000_000, typical_minor: null, good_minor: null }]);
+    expect(profile.income_band.results).toMatchObject({ break_even_minor: 47_350_000, essentials_break_even_minor: 33_000_000, lean_months_covered: 1, lean_months_of_essentials_covered: 2.3 });
+    const balances = (r: any) => r.scenarios.map((s: any) => s.balance_minor);
+    expect(balances(profile.income_band.results)).toEqual([-27_350_000, null, null]);
+
+    const include = ['scenarios'];
+    const saved = await agent.call('save_plan_version', { summary: 'Nothing budgeted', budget: [], include }, NEWER);
+    expect(saved.results.scenarios).toMatchObject({ basis: 'declared', omitted_spending_minor: 47_350_000 });
+    expect(balances(saved.results.scenarios)).toEqual([-27_350_000, null, null]);
+    expect((await agent.call('get_current_plan', { include }, NEWER)).plan.results.scenarios).toEqual(saved.results.scenarios);
+    expect((await agent.call('get_plan_version', { version: 1, include }, NEWER)).plan.results.scenarios).toEqual(saved.results.scenarios);
+
+    // The agent records what the user then says about other months.
+    const { id } = profile.income_band.sources[0];
+    const item = { kind: 'income', label: 'Work', amount_minor: 20_000_000, frequency: 'monthly', variability: 'variable', typical_minor: 50_000_000 };
+    await agent.call('update_profile', { expected_revision: profile.revision, items: [{ op: 'upsert', id, item }] });
+    const after = await agent.call('get_profile', { sections: ['income_band'] }, NEWER);
+    expect(balances(after.income_band.results)).toEqual([-27_350_000, 2_650_000, null]);
+  });
+
+  it('says so plainly when income does not vary', async () => {
+    const user = await newUser();
+    const agent = await stack.connect(user, ['finance:read']);
+    await upsertItem(ctx, user, USER, { kind: 'income', label: 'Salary', amountMinor: 500, frequency: 'monthly' });
+    const { income_band } = await agent.call('get_profile', { sections: ['income_band'] }, NEWER);
+    expect(income_band).toMatchObject({ varies: false, lean_minor: 500, typical_minor: 500, results: null });
+  });
+
+  it('can be put through the calculators, each result labelled', async () => {
+    const agent = await stack.connect(await newUser(), ['finance:read']);
+    const set = { lean_minor: 100, typical_minor: 300 };
+    const budget = await agent.call('calc_budget', { net_income_scenarios: set, expenses: [{ category: 'food', amount_minor: 200, essential: true }], method: 'zero_based' }, NEWER);
+    expect(budget).toMatchObject({ net_income_minor: 100, shortfall_minor: 100 }); // the main result is the lean one
+    expect(budget.scenarios.map((s: any) => [s.scenario, s.result.shortfall_minor, s.result.surplus_minor])).toEqual([['lean', 100, 0], ['typical', 0, 100]]);
+    const debts = [{ id: 'a', balance_minor: 600, apr_bps: 0, minimum_payment_minor: 0 }];
+    const payoff = await agent.call('calc_debt_payoff', { debts, monthly_budget_scenarios: set, strategy: 'snowball' }, NEWER);
+    expect(payoff.scenarios.map((s: any) => s.result.snowball.months_to_debt_free)).toEqual([6, 2]);
+    const savings = await agent.call('calc_savings_projection', { starting_balance_minor: 0, monthly_contribution_scenarios: { ...set, good_minor: 400 }, annual_rate_bps: 0, months: 12 }, NEWER);
+    expect(savings.scenarios.map((s: any) => [s.scenario, s.result.final_balance_minor])).toEqual([['lean', 1200], ['typical', 3600], ['good', 4800]]);
+
+    const wrong = (args: object) => agent.call('calc_budget', { expenses: [], method: 'zero_based', ...args });
+    await expect(wrong({})).rejects.toThrow(/Give either/);
+    await expect(wrong({ net_income_minor: 1, net_income_scenarios: set })).rejects.toThrow(/Give either/);
+    await expect(wrong({ net_income_scenarios: { lean_minor: 5, typical_minor: 4 } })).rejects.toThrow(/below a lean one/);
   });
 });
 

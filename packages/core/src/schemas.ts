@@ -53,8 +53,20 @@ export const profileDetails = z.object({
 });
 export type ProfileDetails = z.infer<typeof profileDetails>;
 
+export const INCOME_VARIABILITY = ['fixed', 'variable'] as const;
+
 export const itemData = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('income'), label: text(80), amountMinor: amount, frequency }),
+  z.object({
+    kind: z.literal('income'),
+    label: text(80),
+    /** When income is variable, the least the user can count on in a month. Code that knows nothing of variable income reads the cautious figure. */
+    amountMinor: amount,
+    frequency,
+    variability: z.enum(INCOME_VARIABILITY).optional(),
+    /** What a typical and a good month bring in, when income is variable. Null clears one; either may be unknown. */
+    typicalMinor: amount.nullable().optional(),
+    highMinor: amount.nullable().optional(),
+  }),
   z.object({
     kind: z.literal('expense'),
     label: text(80),
@@ -80,6 +92,21 @@ export const itemData = z.discriminatedUnion('kind', [
   }),
 ]);
 export type ItemData = z.infer<typeof itemData>;
+
+/** Rules on a whole item, checked once an update has been combined with what was stored. */
+export const completeItem = itemData.superRefine((item, issues) => {
+  if (item.kind !== 'income') return;
+  const fail = (path: string, message: string) => issues.addIssue({ code: 'custom', path: [path], message });
+  const typical = item.typicalMinor ?? null;
+  const high = item.highMinor ?? null;
+  if (item.variability !== 'variable') {
+    if (typical !== null || high !== null) fail('variability', 'A typical or good month can only be given for variable income');
+    return;
+  }
+  if (item.frequency !== 'monthly') fail('frequency', 'Variable income is recorded by the month');
+  if (typical !== null && typical < item.amountMinor) fail('typicalMinor', 'A typical month cannot be below a lean one');
+  if (high !== null && high < Math.max(item.amountMinor, typical ?? 0)) fail('highMinor', 'A good month cannot be below a typical or lean one');
+});
 export type ItemKind = ItemData['kind'];
 
 export const GOAL_KINDS = ['emergency_fund', 'debt_free', 'purchase', 'education', 'retirement', 'other'] as const;

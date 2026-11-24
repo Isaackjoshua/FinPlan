@@ -1,3 +1,4 @@
+import { ScenarioNotes, ScenarioTable } from '@/components/income-scenarios';
 import { monthName } from '@/components/plan-results';
 import { Empty, Flash, formatPeriod, PageHeader } from '@/components/ui';
 import { run, str } from '@/lib/forms';
@@ -60,7 +61,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     listCheckIns(ctx, userId, 1),
     getLessonStates(ctx, userId),
   ]);
-  const { summary: s, warnings, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
+  const { summary: s, warnings, scenarios, surplusReliable, acknowledged } = checkProfile(items, profile.acknowledgedWarnings);
   // While another check is open, settling "unreliable" on its own would change nothing.
   const openChecks = warnings.filter((w) => isCompletenessCode(w.code) && w.code !== 'surplus_unreliable').length;
   const activeGoals = goals.filter((g) => g.status === 'active');
@@ -89,7 +90,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <section aria-labelledby="month-heading" className="card mb-6 sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:gap-10">
             <div>
-              <h2 id="month-heading" className="text-sm font-medium text-muted">{s.monthlySurplus < 0 ? 'Short each month' : 'Left over each month'}</h2>
+              <h2 id="month-heading" className="text-sm font-medium text-muted">{surplusReliable ? `${s.monthlySurplus < 0 ? 'Short' : 'Left over'} ${scenarios ? 'in a lean month' : 'each month'}` : 'Left over each month'}</h2>
               {surplusReliable ? (
                 <p className={`num mt-1 text-[2.5rem] font-semibold leading-none tracking-tight sm:text-5xl ${s.monthlySurplus < 0 ? 'text-danger' : 'text-brand'}`}>
                   {formatAmount(Math.abs(s.monthlySurplus), cur)}
@@ -98,7 +99,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <>
                   <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Not enough information yet</p>
                   <p className="mt-2 text-sm text-muted">
-                    What is recorded so far leaves <span className="num">{formatAmount(s.monthlySurplus, cur)}</span>, but spending looks incomplete.{' '}
+                    {scenarios ? (
+                      'What is recorded so far leaves money over in some months, but spending looks incomplete.'
+                    ) : (
+                      <>What is recorded so far leaves <span className="num">{formatAmount(s.monthlySurplus, cur)}</span>, but spending looks incomplete.</>
+                    )}{' '}
                     <Link href="/profile" className="link">Add what is missing</Link>
                   </p>
                 </>
@@ -108,7 +113,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <div className={`h-full ${s.monthlySurplus < 0 ? 'bg-danger' : 'bg-ink'}`} style={{ width: `${Math.min(100, spentShare)}%` }} />
               </div>
               <dl className="mt-3 flex flex-wrap justify-between gap-x-6 gap-y-1 text-sm">
-                <div className="flex gap-1.5"><dt className="text-muted">Income</dt><dd className="num font-medium">{formatAmount(s.monthlyIncome, cur)}</dd></div>
+                <div className="flex gap-1.5"><dt className="text-muted">{scenarios ? 'Lean income' : 'Income'}</dt><dd className="num font-medium">{formatAmount(s.monthlyIncome, cur)}</dd></div>
                 <div className="flex gap-1.5"><dt className="text-muted">Expenses</dt><dd className="num font-medium">{formatAmount(s.monthlyExpenses, cur)} <span className="font-normal text-muted">({spentShare}%)</span></dd></div>
               </dl>
             </div>
@@ -120,6 +125,21 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <dd className="num font-semibold">{monthsCovered ? `${monthsCovered} months of essentials` : formatAmount(s.emergencyFund, cur)}</dd>
               </div>
             </dl>
+          </div>
+        </section>
+      )}
+
+      {scenarios && surplusReliable && (
+        <section className="card mb-6 text-sm">
+          <h2 className="text-lg font-semibold">When your income varies</h2>
+          <div className="mt-2 grid gap-x-10 gap-y-3 lg:grid-cols-2">
+            <ScenarioTable result={scenarios} currency={cur} />
+            <div className="text-muted lg:pt-2">
+              <ScenarioNotes result={scenarios} currency={cur} />
+              {scenarios.scenarios.some((one) => one.incomeMinor === null) && (
+                <p className="mt-2"><Link href="/profile" className="link">Add what you know about other months</Link></p>
+              )}
+            </div>
           </div>
         </section>
       )}

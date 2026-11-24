@@ -2,13 +2,17 @@ import {
   calcBudget,
   calcEmergencyFund,
   calcSavingsProjection,
+  calcScenarios,
   compareDebtStrategies,
   ENGINE_VERSION,
   monthlyInterest,
   type BudgetResult,
   type DebtComparison,
   type EmergencyFundResult,
+  type ScenariosResult,
 } from '@fin/calc';
+import { incomeBand, type IncomeBand } from './income';
+import { toMonthly } from './money';
 import type { Goal, Item } from './profile';
 import type { PlanInputs } from './schemas';
 import { summarise } from './summary';
@@ -40,19 +44,27 @@ export interface PlanResults {
   emergencyFund: EmergencyFundResult;
   goals: { goalId: string; monthsToTarget: number | null; targetReachedMonth: string | null }[];
   warnings: Warning[];
+  /** Only when income varies; `monthly` then describes a lean month. */
+  scenarios?: PlanScenarios;
+}
+
+export interface PlanScenarios extends ScenariosResult {
+  basis: IncomeBand['basis'];
+  /** Spending in the profile that the plan leaves out. The scenarios count it, because it will still be spent. */
+  omittedSpendingMinor: number;
 }
 
 /**
- * Whether the plan leaves out a category the profile spends on. Planning zero for a category is
- * taken as a decision to cut it, unless any of that spending is marked essential.
+ * The expenses in categories the plan leaves out. Planning zero for a category is taken as a
+ * decision to cut it, unless any of that spending is marked essential.
  */
-function omitsExpenses(items: Item[], inputs: PlanInputs): boolean {
+function omittedExpenses(items: Item[], inputs: PlanInputs) {
   const planned = new Map<string, number>();
   for (const row of inputs.budget) planned.set(row.category, (planned.get(row.category) ?? 0) + row.amountMinor);
-  return items.some((item) => {
-    if (item.kind !== 'expense' || item.amountMinor === 0) return false;
-    const amount = planned.get(item.category);
-    return amount === undefined || (amount === 0 && item.essential);
+  const expenses = items.filter((item) => item.kind === 'expense').filter((item) => item.amountMinor > 0);
+  return expenses.filter(({ category, essential }) => {
+    const amount = planned.get(category);
+    return amount === undefined || (amount === 0 && essential);
   });
 }
 
@@ -73,17 +85,47 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
   const toGoals = contributions.reduce((sum, c) => sum + c.amountMinor, 0);
   const unallocated = summary.monthlyIncome - budgeted - debtPayments - toGoals;
 
-  if (omitsExpenses(items, inputs)) {
+  const omitted = omittedExpenses(items, inputs);
+  const band = incomeBand(items);
+  const scenarios: PlanScenarios | undefined = band.varies ? planScenarios() : undefined;
+
+  function planScenarios(): PlanScenarios {
+    const omittedSpendingMinor = omitted.reduce((sum, e) => sum + toMonthly(e.amountMinor, e.frequency), 0);
+    return {
+      basis: band.basis,
+      omittedSpendingMinor,
+      ...calcScenarios({
+        income: band,
+        outgoingsMinor: budgeted + omittedSpendingMinor + debtPayments + toGoals,
+        essentialOutgoingsMinor: summary.monthlyEssentialExpenses + summary.monthlyDebtMinimums,
+        goalContributionsMinor: toGoals,
+        bufferMinor: summary.emergencyFund,
+      }),
+    };
+  }
+
+  if (omitted.length > 0) {
     warnings.push({
       code: 'plan_omits_expenses',
       severity: 'warn',
-      message: 'This plan sets nothing aside for some of the spending in your profile, so the money it shows as left over is too high.',
+      message: `This plan sets nothing aside for some of the spending in your profile, so ${unallocated < 0 ? 'the real shortfall is larger' : 'the money it shows as left over is too high'}.`,
     });
   }
   if (contributions.length < inputs.goalContributions.length) {
     warnings.push({ code: 'goal_not_active', severity: 'info', message: 'A contribution to a goal that is not active was left out.' });
   }
-  if (unallocated < 0) {
+  if (scenarios) {
+    const [lean, typical] = scenarios.scenarios;
+    const costs = omitted.length > 0 ? 'this plan and the spending it leaves out come' : 'this plan comes';
+    if (lean!.balanceMinor! < 0) {
+      warnings.push({ code: 'lean_month_shortfall', severity: 'warn', message: `In a lean month, ${costs} to more than your income.` });
+    }
+    if (typical!.balanceMinor === null) {
+      warnings.push({ code: 'income_uncertain', severity: 'info', message: 'What comes in during a typical month is not recorded, so only a lean month can be worked out. Dates in this plan assume every month can pay for it.' });
+    } else if (typical!.balanceMinor < 0) {
+      warnings.push({ code: 'plan_exceeds_income', severity: 'warn', message: `Even in a typical month, ${costs} to more than your income.` });
+    }
+  } else if (unallocated < 0) {
     warnings.push({ code: 'plan_exceeds_income', severity: 'warn', message: 'This plan allocates more each month than your recorded income.' });
   }
 
@@ -142,5 +184,6 @@ export function computePlanResults(items: Item[], goals: Goal[], inputs: PlanInp
       return { goalId: c.goalId, monthsToTarget: projection.monthsToTarget, targetReachedMonth: projection.targetReachedMonth };
     }),
     warnings,
+    ...(scenarios && { scenarios }),
   };
 }

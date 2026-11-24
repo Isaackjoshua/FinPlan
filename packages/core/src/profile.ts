@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, isNull, schema, sql, type Executor } from '@fin/db';
-import type { z } from 'zod';
+import { z } from 'zod';
 import {
   actorColumns,
   ConflictError,
@@ -10,6 +10,7 @@ import {
 } from './context';
 import { openJson, sealJson } from './crypto';
 import {
+  completeItem,
   goalData,
   goalStatus,
   itemData,
@@ -195,21 +196,57 @@ export async function setWarningAcknowledged(ctx: Ctx, userId: string, code: Com
   });
 }
 
+/** The form an item is stored in: cleared and unused fields are left out, so fixed income looks as it always has. */
+function tidy(item: ItemData): ItemData {
+  if (item.kind !== 'income') return item;
+  const { variability, typicalMinor, highMinor, ...rest } = item;
+  if (variability === 'fixed') return rest;
+  return {
+    ...rest,
+    ...(variability && { variability }),
+    ...(typicalMinor != null && { typicalMinor }),
+    ...(highMinor != null && { highMinor }),
+  };
+}
+
+/**
+ * A writer that does not know about variable income (an app that connected earlier) sees only
+ * the lean figure. If it changes that, what it means is anyone's guess, so it is asked to say.
+ */
+function refuseBlindChange(stored: ItemData, data: ItemData) {
+  if (stored.kind !== 'income' || data.kind !== 'income' || stored.variability !== 'variable' || data.variability !== undefined) return;
+  if (stored.amountMinor === data.amountMinor && stored.frequency === data.frequency) return;
+  throw new z.ZodError([
+    {
+      code: 'custom',
+      path: ['variability'],
+      message: 'This income is recorded as changing from month to month, and its amount is the least that comes in. To change it, say whether it is "variable" or "fixed"',
+      input: undefined,
+    },
+  ]);
+}
+
 async function writeItem(tx: Executor, key: Buffer, userId: string, data: ItemData, id?: string): Promise<string> {
   if (id) {
     // user_id is part of every WHERE clause: knowing an id is never enough.
     const mine = and(eq(profileItems.id, id), eq(profileItems.userId, userId), eq(profileItems.kind, data.kind), isNull(profileItems.archivedAt));
     const [row] = await tx.select({ data: profileItems.data }).from(profileItems).where(mine);
     if (!row) throw new NotFoundError(`Item ${id}`);
+    const stored = openJson<ItemData>(key, aad.item(userId, id), row.data);
+    refuseBlindChange(stored, data);
     // Whatever the writer did not mention stays as it was.
-    const next = { ...openJson<ItemData>(key, aad.item(userId, id), row.data), ...data };
+    const mentioned = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+    const next = tidy({ ...stored, ...mentioned } as ItemData);
+    completeItem.parse(next);
     await tx.update(profileItems).set({ data: sealJson(key, aad.item(userId, id), next) }).where(mine);
     return id;
   }
   const newId = crypto.randomUUID();
+  const next = tidy(data);
+  completeItem.parse(next);
   await tx
     .insert(profileItems)
-    .values({ id: newId, userId, kind: data.kind, data: sealJson(key, aad.item(userId, newId), data) });
+    .values({ id: newId, userId, kind: data.kind, data: sealJson(key, aad.item(userId, newId), next) });
   return newId;
 }
 
