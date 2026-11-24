@@ -570,7 +570,7 @@ const getCashFlowTool = tool({
 
 const allocationLines = z.array(
   z.strictObject({
-    group: z.enum(ALLOCATION_GROUPS).describe('In order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals, the rest of the spending.'),
+    group: z.enum(ALLOCATION_GROUPS).describe('In order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals, the rest of the spending. Big bills the user could do without come last of all.'),
     id: z.string().describe('The expense, debt or goal.'),
     wanted_minor: totalMinor,
     allocated_minor: minor,
@@ -585,7 +585,7 @@ const previewAllocationTool = tool({
   title: 'Preview sharing out money',
   kind: 'read',
   scope: 'finance:read',
-  description: `Work out how an amount of money the user has now would be shared out, in a fixed order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals in line, then the rest. Each gets what it still needs this month before the next gets anything. Stores nothing. ${MINOR_NOTE} ${POSITIONING}`,
+  description: `Work out how an amount of money the user has now would be shared out, in a fixed order: survival costs, money set aside for big bills, minimum debt payments, committed costs, goals in line, then the rest, big bills the user could do without included. Each gets what it still needs this month before the next gets anything. Stores nothing. ${MINOR_NOTE} ${POSITIONING}`,
   input: z.strictObject({ available_minor: minor.describe('The money to share out.') }),
   output: z.strictObject({ currency: z.string(), ...allocationPlan }),
   async run({ available_minor }, auth, { ctx }) {

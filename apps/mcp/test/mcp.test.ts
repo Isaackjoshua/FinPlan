@@ -251,7 +251,7 @@ describe('what a connection may do', () => {
 });
 
 describe('spending, bills and timing', () => {
-  const NEWER = 'newest';
+  const NEWER = 'measured';
   const DAY = new Date().toISOString().slice(0, 10);
   const seeded = async (scopes = ['finance:read', 'finance:write']) => {
     const user = await newUser('TZS');

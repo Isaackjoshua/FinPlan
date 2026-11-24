@@ -11,13 +11,15 @@ const read = (name: string) => JSON.parse(readFileSync(new URL(`./contract/${nam
 
 /**
  * Tool lists as they were released. Never regenerate one: AI apps that connected then check every
- * answer against it. `base` is from before variable income; `variable` is the release that added it.
+ * answer against it. `base` is from before variable income; `variable` is the release that added it, and
+ * `measured` the one with measured income, big bills and sharing out.
  */
-export const CONTRACTS = { base: read('2026-11'), variable: read('2026-11-variable') };
+export const CONTRACTS = { base: read('2026-11'), variable: read('2026-11-variable'), measured: read('2026-11-measured') };
 export const CONTRACT = CONTRACTS.base;
 
-/** What a call asks for that is newer than a release: nothing, what `variable` added, or what came after it. */
-export type Asks = 'base' | 'variable' | 'newest';
+/** The earliest release that knows everything a call asks for. */
+export type Asks = keyof typeof CONTRACTS;
+const RELEASES = Object.keys(CONTRACTS) as Asks[];
 
 const validators = Object.fromEntries(
   Object.entries(CONTRACTS).map(([release, contract]) => [release, new Map(Object.entries(contract).map(([name, { output }]) => [name, z.fromJSONSchema(output as never)]))]),
@@ -25,6 +27,5 @@ const validators = Object.fromEntries(
 
 /** Throws if an app holding a released tool list that the call fits would reject the answer. Tools added since are not checked. */
 export function matchesContract(name: string, answer: unknown, asks: Asks = 'base') {
-  if (asks === 'base') validators.base!.get(name)?.parse(answer);
-  if (asks !== 'newest') validators.variable!.get(name)?.parse(answer);
+  for (const release of RELEASES.slice(RELEASES.indexOf(asks))) validators[release]!.get(name)?.parse(answer);
 }

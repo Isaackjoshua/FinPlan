@@ -446,6 +446,19 @@ describe('sharing out money', () => {
     expect(shareOut([fun, { ...debt, balanceMinor: 0, minimumPaymentMinor: 5 } as Item], [{ ...goals[0]!, currentAmountMinor: tzs(200_000) }, goals[2]!], 9, TODAY).lines).toEqual([{ group: 'discretionary', id: 'fun', wantedMinor: 5, allocatedMinor: 5, unmetMinor: 0 }]);
   });
 
+  it('leaves big bills the user could do without until last', () => {
+    const holiday = { ...rent, id: 'holiday', label: 'Holiday', tier: 'discretionary', essential: false, frequency: 'yearly', amountMinor: tzs(120_000) } as Item;
+    const fun = { ...food, id: 'fun', tier: 'discretionary', essential: false, amountMinor: tzs(1_000) } as Item;
+    const all = shareOut([holiday, fun, ...payable], goals, tzs(2_000_000), TODAY);
+    expect(all.lines.slice(4, 6).map((l) => l.id)).toEqual(['rent', 'debt']);
+    expect(all.lines.slice(-2).map((l) => [l.group, l.id, l.allocatedMinor / 100])).toEqual([['discretionary', 'fun', 1_000], ['set_aside', 'holiday', 10_000]]);
+    const lean = shareOut([holiday, fun, ...payable], goals, tzs(340_000), TODAY);
+    expect(lean.lines.find((l) => l.id === 'debt')!.unmetMinor).toBe(0);
+    expect(lean.lines.find((l) => l.id === 'holiday')!.allocatedMinor).toBe(0);
+    // Until it is said to be optional by a tier or by not being essential, a bill is one to be ready for.
+    expect(shareOut([{ ...holiday, tier: 'committed' } as Item, ...payable], goals, 0, TODAY).lines.filter((l) => l.group === 'set_aside').map((l) => l.id)).toEqual(['holiday', 'rent']);
+  });
+
   async function seeded() {
     const user = await newUser();
     const ids = new Map<string, string>();

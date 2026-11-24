@@ -227,7 +227,8 @@ The calculation package keeps its 100% coverage rule.
 
 ### Choices made while building slices 3 to 9
 
-- **Other spending comes last in the waterfall**, after goals. The approved order did not place it.
+- **Other spending comes last in the waterfall**, after goals, and big bills the user could do without (a
+  yearly holiday) come after that. The approved order did not place either.
 - **A measured figure only fills gaps** while provisional, and never goes past a declared figure around it.
 - **Needs and wants in a plan follow the tiers only once something has a tier**, so untouched profiles keep
   their numbers.

@@ -49,14 +49,19 @@ function SettleButton({ id, action, children, quiet }: { id: string; action: 'co
 }
 
 function Lines({ allocation, names, currency }: { allocation: Allocation; names: Map<string, string>; currency: string }) {
-  const groups = Object.entries(GROUPS).flatMap(([group, title]) => {
-    const lines = allocation.lines.filter((line) => line.group === group);
-    return lines.length > 0 ? [{ group, title, lines }] : [];
-  });
+  // In the order the money goes. Big bills can come twice: the ones to be ready for, and those that can wait.
+  const groups: { title: string; lines: Allocation['lines'] }[] = [];
+  for (const line of allocation.lines) {
+    if (allocation.lines.indexOf(line) === 0 || groups.at(-1)!.lines[0]!.group !== line.group) {
+      const again = groups.some((g) => g.lines[0]!.group === line.group);
+      groups.push({ title: again ? 'Set aside for what you could do without' : GROUPS[line.group], lines: [] });
+    }
+    groups.at(-1)!.lines.push(line);
+  }
   return (
     <div className="space-y-4 text-sm">
-      {groups.map(({ group, title, lines }) => (
-        <div key={group}>
+      {groups.map(({ title, lines }) => (
+        <div key={title}>
           <h3 className="font-medium">{title}</h3>
           <ul className="divide-y divide-line">
             {lines.map((line) => (

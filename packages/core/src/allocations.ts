@@ -52,7 +52,8 @@ export function givenToBills(earlier: Pick<Allocation, 'lines'>[]): Map<string, 
 
 /**
  * Shares out money in order: survival costs, money set aside for big bills, minimum debt
- * payments, committed costs, then goals in line, then the rest of the spending. What was already
+ * payments, committed costs, then goals in line, then the rest of the spending and bills the user
+ * could do without. What was already
  * given this month is not asked for again. Goals move on only once the bills before them are met.
  */
 export function shareOut(items: Item[], goals: Goal[], availableMinor: number, today: string, earlier: Pick<Allocation, 'lines'>[] = []): Omit<AllocationPlan, 'revision'> {
@@ -67,7 +68,10 @@ export function shareOut(items: Item[], goals: Goal[], availableMinor: number, t
   };
 
   spend('survival');
-  for (const o of obligations(items, today, givenToBills(earlier)).items) steps.push({ group: 'set_aside', id: o.id, needMinor: o.setAsideMinor });
+  const optional = new Set(expensesOf(items).flatMap((e) => (tierOf(e) === 'discretionary' ? [e.id] : [])));
+  const bills = obligations(items, today, givenToBills(earlier)).items;
+  const reserve = (some: typeof bills) => some.forEach((o) => steps.push({ group: 'set_aside', id: o.id, needMinor: o.setAsideMinor }));
+  reserve(bills.filter((o) => !optional.has(o.id)));
   for (const item of items) {
     if (item.kind === 'debt') steps.push({ group: 'debt', id: item.id, needMinor: Math.max(0, Math.min(item.minimumPaymentMinor, item.balanceMinor) - given('debt', item.id)) });
   }
@@ -77,6 +81,8 @@ export function shareOut(items: Item[], goals: Goal[], availableMinor: number, t
     steps.push({ group: 'goal', id: goal.id, needMinor, ...(goal.monthlyCapMinor != null && { capMinor: Math.max(0, goal.monthlyCapMinor - given('goal', goal.id)) }) });
   }
   spend('discretionary');
+  // A bill the user could do without, such as a yearly holiday, waits with the rest of such spending.
+  reserve(bills.filter((o) => optional.has(o.id)));
 
   const wanted = steps.filter((step) => Math.min(step.needMinor, step.capMinor ?? Infinity) > 0);
   const { lines, firstUnmetId: _first, ...totals } = calcAllocation({ availableMinor, steps: wanted.map((step) => ({ ...step, id: `${step.group}:${step.id}` })) });

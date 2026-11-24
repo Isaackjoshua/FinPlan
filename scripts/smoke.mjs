@@ -285,10 +285,12 @@ const goalsPage = txt((await get('/goals')).html);
 check('a goal is the total of its parts', goalsPage.includes('KES 0.00 of KES 10,000.00') && goalsPage.includes('Top, Legs'));
 check('a goal out of reach is said to be', goalsPage.includes('more than any month is known to leave over'));
 
+await add('expense', { label: 'Holiday', amount: '24000', frequency: 'yearly', category: 'entertainment', tier: 'discretionary' });
 check('sharing out needs an amount', (await submit('/share-out', has('amount'), { amount: 'lots' })).includes('error='));
 await submit('/share-out', has('amount'), { amount: '90000' });
 let share = txt((await get('/share-out')).html);
 check('money goes to what is needed first', share.includes('What you cannot live without') && share.indexOf('Rent') < share.indexOf('School fees') && share.indexOf('School fees') < share.indexOf('Desk'));
+check('a big bill that can wait comes after the goals', share.indexOf('Desk') < share.indexOf('Set aside for what you could do without') && share.indexOf('Set aside for big bills') < share.indexOf('School fees'));
 check('nothing moves before it is confirmed', txt((await get('/goals')).html).includes('KES 0.00 of KES 10,000.00'));
 await submit('/share-out', (f) => f.hidden.action === 'confirm', {});
 check('confirming moves the goal on', txt((await get('/goals')).html).includes('KES 3,000.00 of KES 10,000.00'), txt((await get('/goals')).html).slice(0, 600));
